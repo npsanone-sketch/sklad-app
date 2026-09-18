@@ -77,8 +77,7 @@
             <label class="block text-sm font-medium mb-1">Скопируйте таблицу из Excel и вставьте сюда:</label>
             <textarea id="new-manifests-list" rows="6" oninput="updateManifestCount()" placeholder="Вставьте скопированные данные..." class="w-full border rounded p-2 mb-1 font-mono text-xs whitespace-pre"></textarea>
             
-            <!-- СЧЕТЧИК РАСПОЗНАННЫХ НОМЕРОВ -->
-            <div id="manifest-counter" class="text-green-600 font-bold mb-4 h-6">Распознано номеров: 0 шт.</div>
+            <div id="manifest-counter" class="text-green-600 font-bold mb-4 h-6">Распознано: 0 манифестов (0 палет)</div>
 
             <div class="flex justify-end gap-2">
                 <button onclick="hideCreateForm()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 font-bold">Отмена</button>
@@ -90,13 +89,13 @@
     <!-- Экран сканирования -->
     <div id="scan-screen" class="hidden flex-1 flex flex-col no-print bg-white overflow-hidden relative">
         
-        <!-- ЭКРАН РАЗБЛОКИРОВКИ ЗВУКА НА МОБИЛЬНОМ -->
+        <!-- ЭКРАН РАЗБЛОКИРОВКИ ЗВУКА -->
         <div id="sound-unlock-overlay" class="flex">
             <h2 class="text-3xl font-bold mb-8 text-center px-4">Режим сканирования</h2>
             <button onclick="unlockAudio()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-6 px-12 rounded-full text-2xl shadow-2xl animate-pulse">
                 ВКЛЮЧИТЬ ЗВУК И НАЧАТЬ
             </button>
-            <p class="mt-6 text-blue-200 text-center px-4">Это необходимо для работы звуковых сигналов в браузере телефона</p>
+            <p class="mt-6 text-blue-200 text-center px-4">Внимание: Убедитесь, что на телефоне НЕ включен беззвучный режим!</p>
         </div>
 
         <div class="bg-gray-200 p-4 flex justify-between items-center border-b shrink-0">
@@ -107,7 +106,7 @@
             <div class="flex gap-2 items-center">
                 <div class="text-right mr-2">
                     <div class="text-xl md:text-2xl font-bold text-blue-600"><span id="scan-count">0</span> / <span id="scan-total">0</span></div>
-                    <div class="text-xs text-gray-500">загружено</div>
+                    <div class="text-xs text-gray-500">мест (палет)</div>
                 </div>
                 <button onclick="generatePDF()" class="bg-blue-600 text-white px-3 py-2 rounded font-bold text-sm">Акт</button>
             </div>
@@ -119,14 +118,13 @@
                 <input type="text" id="scanner-input" autocomplete="off" class="w-full max-w-2xl text-center text-2xl md:text-4xl font-mono border-4 border-blue-400 rounded-lg p-4 md:p-6 shadow-inner focus:outline-none focus:border-blue-600 focus:bg-blue-50" placeholder="Сканируйте штрих-код...">
                 <button onclick="document.getElementById('scanner-input').focus()" class="mt-4 text-sm text-blue-500 underline">Вернуть фокус сканеру</button>
                 
-                <!-- ИНФОРМАЦИЯ О ПОСЛЕДНЕМ ОТСКАНИРОВАННОМ -->
                 <div id="scan-last-result" class="mt-6 text-center h-24"></div>
             </div>
 
-            <!-- Правая часть: Видимый список номеров -->
+            <!-- Правая часть: Список -->
             <div class="w-full md:w-1/3 lg:w-1/4 bg-gray-50 flex flex-col shrink-0 h-1/2 md:h-full">
                 <div class="bg-gray-200 p-2 text-center font-bold text-sm text-gray-700 shadow-sm z-10">
-                    Предварительный список
+                    План загрузки (документы)
                 </div>
                 <div class="flex-1 overflow-y-auto p-2">
                     <ul id="manifest-items-list" class="space-y-2">
@@ -147,7 +145,6 @@
     <div id="print-area" class="hidden bg-white"></div>
 
     <script>
-        // Ваши ключи базы данных
         const firebaseConfig = {
           apiKey: "AIzaSyBUp11R-Sq46IrW9lwH5uFjXXzli5OASsU",
           authDomain: "sklad-app-b04e3.firebaseapp.com",
@@ -166,24 +163,21 @@
         let unsubscribeCurrentScan = null;
         let currentManifestDoc = null; 
         
-        // --- 1. АБСОЛЮТНО НАДЕЖНЫЙ ЗВУК ---
+        // --- ЗВУК ---
         let audioCtx = null;
         
         function unlockAudio() {
-            // Создаем контекст именно в момент клика по кнопке СТАРТ!
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
             
-            // Запускаем тихий звук для разблокировки
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            gain.gain.value = 0; // тишина
+            gain.gain.value = 0; 
             osc.connect(gain);
             gain.connect(audioCtx.destination);
             osc.start(0);
             osc.stop(audioCtx.currentTime + 0.1);
 
-            // Прячем шторку и фокусируемся на сканере
             document.getElementById('sound-unlock-overlay').style.display = 'none';
             document.getElementById('scanner-input').focus();
         }
@@ -213,45 +207,49 @@
             playTone(155, 'sawtooth', 1.0, 1);
         }
 
-        // --- 2. УМНЫЙ ПАРСЕР EXCEL ---
+        // --- УМНЫЙ ПАРСЕР С ПАЛЛЕТАМИ ---
         function parseExcelData(text) {
             const lines = text.split('\n');
             const items = [];
-            const seen = new Set(); // Защита от двойного сканирования одной строки
+            const seen = new Set();
 
             lines.forEach(line => {
                 line = line.trim();
                 if(!line) return;
 
-                // Супер-надежный поиск номера: ищем MF, затем любые буквы/цифры до слэша (/)
-                // Даже если нет пробелов, он найдет правильно.
+                // Ищем номер манифеста
                 const match = line.match(/(MF[A-Z0-9]+)\//i);
-                if (!match) return; // Пропускаем строку, если нет номера
+                if (!match) return; 
 
                 const code = match[1].toUpperCase();
-
-                if (seen.has(code)) return; // Уже добавили этот код
+                if (seen.has(code)) return; 
                 seen.add(code);
 
-                let brutto = "-", netto = "-", pcs = "-";
+                let brutto = "-", netto = "-", pcs = "-", totalPlaces = 1;
 
-                // Если вставили из Excel, колонки разделены табуляцией (\t)
+                // 1. Попытка распарсить по TAB (если скопировано из Excel)
                 if (line.includes('\t')) {
                     const cols = line.split('\t');
-                    // Индексы колонок (по вашему образцу: 4 - Brutto, 5 - Netto, 7 - PCS)
                     if (cols.length >= 8) {
+                        totalPlaces = parseInt(cols[2], 10) || 1;
                         brutto = cols[4].trim() || "-";
                         netto = cols[5].trim() || "-";
                         pcs = cols[7].trim() || "-";
-                    } else if (cols.length >= 5) {
-                        // Резервный вариант, если скопировали не всю таблицу
-                        brutto = cols[cols.length - 4].trim() || "-";
+                    }
+                } else {
+                    // 2. Резервный поиск, если вставили как сплошной текст без табов
+                    // Ищем цифру перед словом paleta (например "2paleta")
+                    const placesMatch = line.match(/(\d+)\s*paleta/i);
+                    if (placesMatch) {
+                        totalPlaces = parseInt(placesMatch[1], 10) || 1;
                     }
                 }
 
                 items.push({
                     code: code,
                     status: 'pending',
+                    totalPlaces: totalPlaces,
+                    scannedPlaces: 0,
                     scannedBy: null,
                     scannedAt: null,
                     brutto: brutto,
@@ -267,8 +265,10 @@
             const text = document.getElementById('new-manifests-list').value;
             const items = parseExcelData(text);
             const counter = document.getElementById('manifest-counter');
+            
             if (items.length > 0) {
-                counter.innerText = `Распознано номеров: ${items.length} шт.`;
+                const totalPallets = items.reduce((sum, item) => sum + item.totalPlaces, 0);
+                counter.innerText = `Распознано: ${items.length} манифестов (${totalPallets} палет)`;
                 counter.className = "text-green-600 font-bold mb-4 h-6";
             } else {
                 counter.innerText = `Номера пока не найдены...`;
@@ -276,7 +276,6 @@
             }
         }
 
-        // --- АВТОРИЗАЦИЯ И ИНТЕРФЕЙС ---
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
@@ -314,11 +313,10 @@
         async function saveManifest() {
             const car = document.getElementById('new-car-number').value.trim();
             const text = document.getElementById('new-manifests-list').value;
-            
             const items = parseExcelData(text);
 
             if (!car) return alert("Введите номер автомобиля!");
-            if (items.length === 0) return alert("Не удалось распознать ни одного номера манифеста из текста!");
+            if (items.length === 0) return alert("Не удалось распознать номера!");
             
             try {
                 await db.collection('manifests').add({
@@ -337,7 +335,7 @@
 
         async function deleteManifest(event, id) {
             event.stopPropagation();
-            if (confirm("Вы действительно хотите удалить эту ведомость?")) {
+            if (confirm("Удалить ведомость?")) {
                 await db.collection('manifests').doc(id).delete();
             }
         }
@@ -353,23 +351,29 @@
                     
                     snapshot.forEach(doc => {
                         const data = doc.data();
-                        const total = data.items.length;
-                        const scanned = data.items.filter(i => i.status === 'scanned').length;
-                        const isCompleted = total > 0 && scanned === total;
+                        
+                        // Считаем общее количество мест (паллет)
+                        let totalPlaces = 0;
+                        let scannedPlaces = 0;
+                        
+                        data.items.forEach(i => {
+                            totalPlaces += (i.totalPlaces || 1);
+                            scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
+                        });
+
+                        const isCompleted = totalPlaces > 0 && scannedPlaces === totalPlaces;
 
                         const color = isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400';
                         const textColor = isCompleted ? 'text-green-700' : 'text-blue-800';
                         const barColor = isCompleted ? 'bg-green-500' : 'bg-blue-500';
-                        const percent = total > 0 ? (scanned / total) * 100 : 0;
+                        const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
 
                         grid.innerHTML += `
                             <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${color} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
-                                <button onclick="deleteManifest(event, '${doc.id}')" class="absolute top-2 right-2 text-gray-400 hover:text-red-600 bg-white bg-opacity-70 rounded p-1">
-                                    ✖
-                                </button>
+                                <button onclick="deleteManifest(event, '${doc.id}')" class="absolute top-2 right-2 text-gray-400 hover:text-red-600 bg-white bg-opacity-70 rounded p-1">✖</button>
                                 <div class="flex justify-between items-start mb-2 pr-8">
                                     <h3 class="text-xl font-bold ${textColor}">${data.carNumber}</h3>
-                                    <span class="text-sm font-bold ${textColor}">${scanned} / ${total}</span>
+                                    <span class="text-sm font-bold ${textColor}">${scannedPlaces} / ${totalPlaces} мест</span>
                                 </div>
                                 <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
                                     <div class="${barColor} h-2.5 rounded-full" style="width: ${percent}%"></div>
@@ -390,7 +394,6 @@
             document.getElementById('scan-screen').classList.remove('hidden');
             document.getElementById('scan-car-number').innerText = carNumber;
             
-            // Показываем экран принудительной разблокировки звука
             document.getElementById('sound-unlock-overlay').style.display = 'flex';
             
             const input = document.getElementById('scanner-input');
@@ -401,25 +404,41 @@
                 if(doc.exists) {
                     currentManifestDoc = doc.data(); 
                     const data = doc.data();
-                    const total = data.items.length;
-                    const scanned = data.items.filter(i => i.status === 'scanned').length;
                     
-                    document.getElementById('scan-count').innerText = scanned;
-                    document.getElementById('scan-total').innerText = total;
-
-                    // Отрисовка списка с ВЕСОМ
+                    let totalPlaces = 0;
+                    let scannedPlaces = 0;
+                    
                     const listEl = document.getElementById('manifest-items-list');
                     listEl.innerHTML = '';
+                    
                     data.items.forEach(item => {
-                        const isScanned = item.status === 'scanned';
-                        const liClass = isScanned ? 'bg-green-100 text-green-800 line-through decoration-green-500 opacity-70' : 'bg-white text-gray-900 border-gray-300 border-2';
-                        const icon = isScanned ? '✓' : '⏳';
+                        const iTotal = item.totalPlaces || 1;
+                        const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
+                        
+                        totalPlaces += iTotal;
+                        scannedPlaces += iScanned;
+                        
+                        // Логика отображения в списке
+                        let liClass, icon;
+                        if (iScanned === iTotal) {
+                            liClass = 'bg-green-100 text-green-800 opacity-70';
+                            icon = '✓';
+                        } else if (iScanned > 0 && iScanned < iTotal) {
+                            liClass = 'bg-yellow-50 text-yellow-800 border-yellow-400 border-2';
+                            icon = '🔄';
+                        } else {
+                            liClass = 'bg-white text-gray-900 border-gray-300 border-2';
+                            icon = '⏳';
+                        }
                         
                         listEl.innerHTML += `
                             <li class="p-2 rounded flex flex-col gap-1 ${liClass} transition-colors">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-bold">${icon}</span>
-                                    <span class="font-bold text-sm md:text-base">${item.code}</span>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold">${icon}</span>
+                                        <span class="font-bold text-sm md:text-base">${item.code}</span>
+                                    </div>
+                                    <span class="text-xs font-bold bg-white px-2 py-1 rounded opacity-80">${iScanned}/${iTotal} палет</span>
                                 </div>
                                 <div class="text-[10px] md:text-xs text-gray-600 font-mono ml-5">
                                     Вес: ${item.brutto}/${item.netto} | Шт: ${item.pcs}
@@ -427,6 +446,10 @@
                             </li>
                         `;
                     });
+                    
+                    document.getElementById('scan-count').innerText = scannedPlaces;
+                    document.getElementById('scan-total').innerText = totalPlaces;
+
                 } else {
                     closeScanner();
                 }
@@ -463,10 +486,20 @@
 
             for (let i = 0; i < items.length; i++) {
                 if (items[i].code === cleanCode) {
-                    if (items[i].status === 'pending') {
-                        items[i].status = 'scanned';
+                    const iTotal = items[i].totalPlaces || 1;
+                    const iScanned = items[i].scannedPlaces !== undefined ? items[i].scannedPlaces : (items[i].status === 'scanned' ? iTotal : 0);
+
+                    // Если еще не полностью загружено
+                    if (iScanned < iTotal) {
+                        items[i].scannedPlaces = iScanned + 1;
                         items[i].scannedBy = currentUser.email;
                         items[i].scannedAt = new Date().toISOString();
+                        
+                        if (items[i].scannedPlaces === iTotal) {
+                            items[i].status = 'scanned'; // Завершили все паллеты этого манифеста
+                        } else {
+                            items[i].status = 'partial'; // Отсканировали только часть
+                        }
                         
                         foundItem = items[i];
                         await docRef.update({ items: items });
@@ -478,7 +511,7 @@
                 }
             }
 
-            const errorMsg = alreadyScanned ? `Номер ${cleanCode} УЖЕ БЫЛ ЗАГРУЖЕН!` : `Номер ${cleanCode} ЧУЖОЙ!`;
+            const errorMsg = alreadyScanned ? `Номер ${cleanCode} УЖЕ ПОЛНОСТЬЮ ЗАГРУЖЕН!` : `Номер ${cleanCode} ЧУЖОЙ!`;
             
             await docRef.update({
                 errors: firebase.firestore.FieldValue.arrayUnion({
@@ -499,11 +532,15 @@
             void area.offsetWidth; 
             area.classList.add('flash-green');
             
-            // Выводим инфу о весе и штуках на главный экран при успехе
+            const isDone = item.scannedPlaces === (item.totalPlaces || 1);
+            const statusText = isDone ? 'ЗАГРУЖЕНО' : 'В ПРОЦЕССЕ';
+            
             document.getElementById('scan-last-result').innerHTML = `
                 <div class="text-green-600 font-bold text-2xl md:text-3xl">✔ ${item.code}</div>
+                <div class="text-gray-800 font-bold text-xl mt-2 bg-yellow-200 inline-block px-4 py-1 rounded">
+                    ${item.scannedPlaces} из ${item.totalPlaces || 1} палет (${statusText})
+                </div>
                 <div class="text-gray-600 font-bold text-lg mt-2">Вес (B/N): ${item.brutto} / ${item.netto} кг</div>
-                <div class="text-blue-600 font-bold text-lg">Посылок: ${item.pcs} шт</div>
             `;
         }
 
@@ -523,8 +560,14 @@
         function generatePDF() {
             if (!currentManifestDoc) return;
             const data = currentManifestDoc;
-            const total = data.items.length;
-            const scanned = data.items.filter(i => i.status === 'scanned').length;
+            
+            let totalPlaces = 0;
+            let scannedPlaces = 0;
+            data.items.forEach(i => {
+                totalPlaces += (i.totalPlaces || 1);
+                scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
+            });
+            
             const dateStr = new Date().toLocaleString('ru-RU');
 
             let html = `
@@ -532,16 +575,27 @@
                 <p><strong>Автомобиль:</strong> ${data.carNumber}</p>
                 <p><strong>Дата:</strong> ${dateStr}</p>
                 <p><strong>Создал:</strong> ${data.creatorEmail}</p>
-                <p><strong>Статус:</strong> Всего: ${total} / Загружено: ${scanned}</p>
+                <p><strong>Итог:</strong> Всего мест: ${totalPlaces} / Загружено мест: ${scannedPlaces}</p>
                 
                 <table class="print-table">
-                    <thead><tr><th>№</th><th>Код</th><th>Brutto</th><th>Netto</th><th>PCS</th><th>Статус</th></tr></thead>
+                    <thead><tr><th>№</th><th>Код</th><th>Места</th><th>Brutto</th><th>Netto</th><th>PCS</th><th>Статус</th></tr></thead>
                     <tbody>
             `;
 
             data.items.forEach((item, index) => {
-                const statusTxt = item.status === 'scanned' ? 'ЗАГРУЖЕНО' : 'ОЖИДАЕТ';
-                html += `<tr><td>${index + 1}</td><td>${item.code}</td><td>${item.brutto}</td><td>${item.netto}</td><td>${item.pcs}</td><td>${statusTxt}</td></tr>`;
+                const iTotal = item.totalPlaces || 1;
+                const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
+                const statusTxt = iScanned === iTotal ? 'ЗАГРУЖЕНО' : (iScanned > 0 ? 'ЧАСТИЧНО' : 'ОЖИДАЕТ');
+                
+                html += `<tr>
+                    <td>${index + 1}</td>
+                    <td>${item.code}</td>
+                    <td>${iScanned} из ${iTotal}</td>
+                    <td>${item.brutto}</td>
+                    <td>${item.netto}</td>
+                    <td>${item.pcs}</td>
+                    <td>${statusTxt}</td>
+                </tr>`;
             });
 
             html += `</tbody></table>`;
