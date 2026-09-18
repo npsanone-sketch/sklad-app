@@ -13,7 +13,8 @@
         @keyframes flashGreen { 0% { background-color: #22c55e; } 100% { background-color: transparent; } }
         @keyframes flashRed { 0% { background-color: #ef4444; } 100% { background-color: transparent; } }
         .flash-green { animation: flashGreen 1s ease-out; }
-        .flash-red { animation: flashRed 1.5s ease-out; }
+        /* Увеличили длительность красной анимации до 2 секунд */
+        .flash-red { animation: flashRed 2s ease-out; }
         
         #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(239, 68, 68, 0.95); z-index: 50; justify-content: center; align-items: center; flex-direction: column; color: white; }
         
@@ -203,8 +204,9 @@
         }
 
         function playErrorSound() {
-            playTone(150, 'sawtooth', 1.0, 1); 
-            playTone(155, 'sawtooth', 1.0, 1);
+            // УВЕЛИЧЕНО ДО 2 СЕКУНД
+            playTone(150, 'sawtooth', 2.0, 1); 
+            playTone(155, 'sawtooth', 2.0, 1);
         }
 
         // --- УМНЫЙ ПАРСЕР С ПАЛЛЕТАМИ ---
