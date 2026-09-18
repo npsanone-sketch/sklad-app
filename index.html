@@ -18,7 +18,7 @@
             0% { background-color: #ef4444; }
             100% { background-color: transparent; }
         }
-        .flash-green { animation: flashGreen 1s ease-out; }
+        .flash-green { animation: flashGreen 0.8s ease-out; }
         .flash-red { animation: flashRed 1s ease-out; }
         
         #error-overlay {
@@ -29,6 +29,7 @@
             flex-direction: column; color: white;
         }
 
+        /* Обновленные стили для печати */
         @media print {
             body > *:not(#print-area) { display: none !important; }
             #print-area { display: block !important; position: static; width: 100%; color: black; padding: 20px; }
@@ -41,9 +42,18 @@
 </head>
 <body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col">
 
+    <!-- Кастомное окно для ошибок (вместо alert) -->
+    <div id="custom-alert" class="hidden fixed inset-0 z-[100] bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded shadow-lg max-w-sm w-full text-center">
+            <h3 class="text-xl font-bold text-red-600 mb-2">Внимание</h3>
+            <p id="custom-alert-msg" class="mb-4 text-gray-700"></p>
+            <button onclick="closeCustomAlert()" class="bg-blue-600 text-white px-6 py-2 rounded font-bold hover:bg-blue-700">OK</button>
+        </div>
+    </div>
+
     <!-- Экран входа -->
     <div id="login-screen" class="absolute inset-0 z-40 bg-gray-100 flex items-center justify-center">
-        <div class="bg-white p-8 rounded-lg shadow-md w-96 mx-4">
+        <div class="bg-white p-8 rounded-lg shadow-md w-96">
             <h2 class="text-2xl font-bold mb-6 text-center">Вход в систему</h2>
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-1">Email</label>
@@ -59,7 +69,7 @@
     </div>
 
     <!-- Верхняя панель -->
-    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center no-print shrink-0">
+    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center no-print">
         <div>
             <h1 class="text-xl font-bold">Склад - Загрузка</h1>
             <p id="user-info" class="text-sm text-blue-200"></p>
@@ -69,9 +79,9 @@
 
     <!-- Главный экран -->
     <div id="dashboard-screen" class="flex-1 overflow-auto p-4 hidden no-print">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold">Автомобили на загрузку</h2>
-            <button onclick="showCreateForm()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow w-full sm:w-auto">
+            <button onclick="showCreateForm()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow">
                 + Создать ведомость
             </button>
         </div>
@@ -79,7 +89,7 @@
     </div>
 
     <!-- Форма создания -->
-    <div id="create-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 flex items-center justify-center no-print p-4">
+    <div id="create-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 flex items-center justify-center no-print">
         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4">Новая ведомость</h3>
             <input type="text" id="new-car-number" placeholder="Номер авто (АА 1234 ВВ)" class="w-full border rounded p-2 mb-4 font-bold text-lg">
@@ -92,57 +102,41 @@
     </div>
 
     <!-- Экран сканирования -->
-    <div id="scan-screen" class="hidden flex-1 flex flex-col no-print bg-white overflow-hidden">
-        <div class="bg-gray-200 p-4 flex justify-between items-center border-b shrink-0">
+    <div id="scan-screen" class="hidden flex-1 flex flex-col no-print bg-white">
+        <div class="bg-gray-200 p-4 flex justify-between items-center border-b">
             <div>
-                <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 md:px-4 py-2 rounded font-bold mr-2 md:mr-3 text-sm md:text-base">← Назад</button>
-                <span class="text-lg md:text-xl font-bold" id="scan-car-number">АВТОМОБИЛЬ</span>
+                <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded font-bold mr-3">← Назад</button>
+                <span class="text-xl font-bold" id="scan-car-number">АВТОМОБИЛЬ</span>
             </div>
-            <div class="flex gap-2 md:gap-3 items-center">
-                <div class="text-right mr-2 md:mr-4">
-                    <div class="text-xl md:text-2xl font-bold text-blue-600"><span id="scan-count">0</span> / <span id="scan-total">0</span></div>
+            <div class="flex gap-3 items-center">
+                <div class="text-right mr-4">
+                    <div class="text-2xl font-bold text-blue-600"><span id="scan-count">0</span> / <span id="scan-total">0</span></div>
                     <div class="text-xs text-gray-500">загружено</div>
                 </div>
-                <button onclick="generatePDF()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded font-bold text-sm md:text-base">
-                    Акт
+                <button onclick="generatePDF()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold">
+                    Печать Акта
                 </button>
             </div>
         </div>
 
-        <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
-            <!-- Левая часть: Сканер -->
-            <div id="scan-flash-area" class="flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b md:border-b-0 md:border-r overflow-y-auto">
-                <input type="text" id="scanner-input" autocomplete="off" class="w-full max-w-2xl text-center text-2xl md:text-4xl font-mono border-4 border-blue-400 rounded-lg p-4 md:p-6 shadow-inner focus:outline-none focus:border-blue-600 focus:bg-blue-50" placeholder="Сканируйте штрих-код...">
-                <button onclick="document.getElementById('scanner-input').focus()" class="mt-4 text-sm text-blue-500 underline">Вернуть фокус сканеру</button>
-                <div id="scan-last-result" class="mt-4 md:mt-8 text-xl md:text-2xl font-bold h-10 text-center"></div>
-            </div>
-
-            <!-- Правая часть: Видимый список номеров -->
-            <div class="w-full md:w-1/3 lg:w-1/4 bg-gray-50 flex flex-col shrink-0 h-48 md:h-full">
-                <div class="bg-gray-200 p-2 text-center font-bold text-sm text-gray-700 shadow-sm z-10">
-                    Предварительный список
-                </div>
-                <div class="flex-1 overflow-y-auto p-4">
-                    <ul id="manifest-items-list" class="space-y-2">
-                        <!-- Сюда скрипт подставит номера -->
-                    </ul>
-                </div>
-            </div>
+        <div id="scan-flash-area" class="p-6 flex-1 flex flex-col items-center justify-center transition-colors">
+            <input type="text" id="scanner-input" autocomplete="off" autofocus class="w-full max-w-2xl text-center text-4xl font-mono border-4 border-blue-400 rounded-lg p-6 shadow-inner focus:outline-none focus:border-blue-600 focus:bg-blue-50" placeholder="Сканируйте штрих-код...">
+            <div id="scan-last-result" class="mt-8 text-2xl font-bold h-10 text-center"></div>
         </div>
     </div>
 
     <!-- Красная шторка ошибки -->
     <div id="error-overlay">
-        <h1 class="text-4xl md:text-6xl font-bold mb-4">ОШИБКА!</h1>
-        <p class="text-xl md:text-2xl mb-8 text-center px-4" id="error-message">Неправильный номер</p>
-        <button onclick="closeErrorOverlay()" class="bg-white text-red-600 font-bold py-4 px-12 rounded-full text-xl md:text-2xl hover:bg-gray-100">ЗАКРЫТЬ</button>
+        <h1 class="text-6xl font-bold mb-4">ОШИБКА!</h1>
+        <p class="text-2xl mb-8 text-center px-4" id="error-message">Неправильный номер</p>
+        <button onclick="closeErrorOverlay()" class="bg-white text-red-600 font-bold py-4 px-12 rounded-full text-2xl hover:bg-gray-100">ЗАКРЫТЬ</button>
     </div>
 
     <!-- Зона для печати -->
     <div id="print-area" class="hidden bg-white"></div>
 
     <script>
-        // Ваши ключи базы данных
+        // ВАШИ КЛЮЧИ БАЗЫ ДАННЫХ
         const firebaseConfig = {
           apiKey: "AIzaSyBUp11R-Sq46IrW9lwH5uFjXXzli5OASsU",
           authDomain: "sklad-app-b04e3.firebaseapp.com",
@@ -161,10 +155,17 @@
         let unsubscribeCurrentScan = null;
         let currentManifestDoc = null; 
         
-        // --- ГЛОБАЛЬНАЯ РАЗБЛОКИРОВКА ЗВУКА ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ---
-        let audioCtx = null;
-        let audioUnlocked = false;
+        // Кастомный Alert
+        function showMessage(msg) {
+            document.getElementById('custom-alert-msg').innerText = msg;
+            document.getElementById('custom-alert').classList.remove('hidden');
+        }
+        function closeCustomAlert() {
+            document.getElementById('custom-alert').classList.add('hidden');
+        }
 
+        // --- ИСПРАВЛЕННЫЙ ЗВУК ---
+        let audioCtx;
         function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -173,25 +174,10 @@
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
-            if (!audioUnlocked && audioCtx.state === 'running') {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                gain.gain.value = 0; 
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start(0);
-                osc.stop(audioCtx.currentTime + 0.01);
-                audioUnlocked = true;
-            }
         }
 
-        document.addEventListener('touchstart', initAudio, { once: false, passive: true });
-        document.addEventListener('click', initAudio, { once: false, passive: true });
-        document.addEventListener('keydown', initAudio, { once: false, passive: true });
-
         function playTone(freq, type, duration, vol = 1) {
-            initAudio();
-            if(!audioCtx || !audioUnlocked) return;
+            if(!audioCtx || audioCtx.state === 'suspended') return;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = type;
@@ -205,18 +191,16 @@
         }
 
         function playSuccessSound() {
-            // Звук успеха длится 1 секунду
-            playTone(880, 'sine', 0.2, 0.5); 
-            setTimeout(() => playTone(1108, 'sine', 1.0, 0.5), 100);
+            playTone(880, 'sine', 0.1, 0.5); 
+            setTimeout(() => playTone(1108, 'sine', 0.2, 0.5), 100);
         }
 
         function playErrorSound() {
-            // Резкий звук ошибки длится ровно 1 секунду
-            playTone(150, 'sawtooth', 1.0, 1); 
-            playTone(155, 'sawtooth', 1.0, 1);
+            playTone(150, 'sawtooth', 0.4, 1); 
+            playTone(155, 'sawtooth', 0.4, 1);
         }
 
-        // --- АВТОРИЗАЦИЯ ---
+        // --- АВТОРИЗАЦИЯ И ЛОГИКА ---
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
@@ -233,6 +217,7 @@
         });
 
         function login() {
+            initAudio();
             const e = document.getElementById('email').value.trim();
             const p = document.getElementById('password').value.trim();
             const err = document.getElementById('login-error');
@@ -244,23 +229,27 @@
 
         function logout() { auth.signOut(); }
 
-        // --- ГЛАВНЫЙ ЭКРАН И УПРАВЛЕНИЕ ---
         function showCreateForm() {
             document.getElementById('create-modal').classList.remove('hidden');
-            document.getElementById('new-car-number').value = '';
-            document.getElementById('new-manifests-list').value = '';
         }
 
-        function hideCreateForm() { document.getElementById('create-modal').classList.add('hidden'); }
+        function hideCreateForm() { 
+            document.getElementById('create-modal').classList.add('hidden'); 
+        }
 
         async function saveManifest() {
             const car = document.getElementById('new-car-number').value.trim();
             const text = document.getElementById('new-manifests-list').value.trim();
-            if (!car || !text) return alert("Заполните номер авто и список!");
+            
+            if (!car || !text) {
+                showMessage("Заполните номер авто и список!");
+                return;
+            }
 
             const items = text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
             
             try {
+                // Пытаемся записать в базу данных
                 await db.collection('manifests').add({
                     carNumber: car,
                     creatorEmail: currentUser.email,
@@ -269,75 +258,76 @@
                     errors: [],
                     status: 'pending'
                 });
+                
+                // Если успешно записали - очищаем форму и прячем окно
+                document.getElementById('new-car-number').value = '';
+                document.getElementById('new-manifests-list').value = '';
                 hideCreateForm();
-            } catch (err) {
-                alert("Ошибка сохранения: " + err.message + "\nПроверьте правила базы данных Firebase.");
-            }
-        }
 
-        async function deleteManifest(event, id) {
-            event.stopPropagation();
-            if (confirm("Вы действительно хотите удалить эту ведомость?")) {
-                try {
-                    await db.collection('manifests').doc(id).delete();
-                } catch (err) {
-                    alert("Ошибка удаления: " + err.message);
-                }
+            } catch (error) {
+                // Если произошла ошибка (нет прав, пропал интернет и т.д.)
+                console.error("Ошибка при создании ведомости:", error);
+                showMessage("Ошибка сохранения в базу данных:\n" + error.message);
             }
         }
 
         function loadDashboard() {
             if (unsubscribeManifests) unsubscribeManifests();
             
-            unsubscribeManifests = db.collection('manifests')
-                .orderBy('createdAt', 'desc')
-                .onSnapshot(snapshot => {
-                    const grid = document.getElementById('manifests-grid');
-                    grid.innerHTML = '';
-                    
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        const total = data.items.length;
-                        const scanned = data.items.filter(i => i.status === 'scanned').length;
-                        const isCompleted = total > 0 && scanned === total;
+            try {
+                unsubscribeManifests = db.collection('manifests')
+                    .orderBy('createdAt', 'desc')
+                    .onSnapshot(snapshot => {
+                        const grid = document.getElementById('manifests-grid');
+                        grid.innerHTML = '';
+                        
+                        snapshot.forEach(doc => {
+                            const data = doc.data();
+                            const total = data.items.length;
+                            const scanned = data.items.filter(i => i.status === 'scanned').length;
+                            const isCompleted = total > 0 && scanned === total;
 
-                        const color = isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400';
-                        const textColor = isCompleted ? 'text-green-700' : 'text-blue-800';
-                        const barColor = isCompleted ? 'bg-green-500' : 'bg-blue-500';
-                        const percent = total > 0 ? (scanned / total) * 100 : 0;
+                            const color = isCompleted ? 'bg-green-100 border-green-500' : 'bg-red-50 border-red-500';
+                            const textColor = isCompleted ? 'text-green-700' : 'text-red-700';
+                            const barColor = isCompleted ? 'bg-green-500' : 'bg-red-500';
+                            const percent = total > 0 ? (scanned / total) * 100 : 0;
 
-                        grid.innerHTML += `
-                            <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${color} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
-                                <button onclick="deleteManifest(event, '${doc.id}')" class="absolute top-2 right-2 text-gray-400 hover:text-red-600 bg-white bg-opacity-70 rounded p-1 transition">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                                <div class="flex justify-between items-start mb-2 pr-8">
-                                    <h3 class="text-xl font-bold ${textColor}">${data.carNumber}</h3>
-                                    <span class="text-sm font-bold ${textColor}">${scanned} / ${total}</span>
+                            grid.innerHTML += `
+                                <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${color} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <h3 class="text-xl font-bold ${textColor}">${data.carNumber}</h3>
+                                        <span class="text-sm font-bold ${textColor}">${scanned} / ${total}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                                        <div class="${barColor} h-2.5 rounded-full" style="width: ${percent}%"></div>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-2">Создал: ${data.creatorEmail}</div>
+                                    ${data.errors && data.errors.length > 0 ? `<div class="text-xs text-red-600 mt-1 font-bold">Ошибок сканирования: ${data.errors.length}</div>` : ''}
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                                    <div class="${barColor} h-2.5 rounded-full" style="width: ${percent}%"></div>
-                                </div>
-                                <div class="text-xs text-gray-500 mt-2">Создал: ${data.creatorEmail}</div>
-                                ${data.errors && data.errors.length > 0 ? `<div class="text-xs text-red-600 mt-1 font-bold">Ошибок: ${data.errors.length}</div>` : ''}
-                            </div>
-                        `;
+                            `;
+                        });
+                    }, error => {
+                        console.error("Ошибка чтения ведомостей:", error);
+                        showMessage("Ошибка доступа к базе. Проверьте права доступа в Firebase Firestore Rules.");
                     });
-                });
+            } catch (err) {
+                console.error("Critical error in loadDashboard", err);
+            }
         }
 
-        // --- СКАНЕР ---
         let currentScanId = null;
 
         function openScanner(id, carNumber) {
+            initAudio(); 
             currentScanId = id;
             document.getElementById('dashboard-screen').classList.add('hidden');
             document.getElementById('scan-screen').classList.remove('hidden');
             document.getElementById('scan-car-number').innerText = carNumber;
+            document.getElementById('scan-last-result').innerHTML = ''; // Сброс статуса
             
             const input = document.getElementById('scanner-input');
             input.value = '';
-            setTimeout(() => input.focus(), 100); 
+            input.focus();
 
             if (unsubscribeCurrentScan) unsubscribeCurrentScan();
             unsubscribeCurrentScan = db.collection('manifests').doc(id).onSnapshot(doc => {
@@ -346,26 +336,8 @@
                     const data = doc.data();
                     const total = data.items.length;
                     const scanned = data.items.filter(i => i.status === 'scanned').length;
-                    
                     document.getElementById('scan-count').innerText = scanned;
                     document.getElementById('scan-total').innerText = total;
-
-                    const listEl = document.getElementById('manifest-items-list');
-                    listEl.innerHTML = '';
-                    data.items.forEach(item => {
-                        const isScanned = item.status === 'scanned';
-                        const liClass = isScanned ? 'bg-green-100 text-green-800 line-through decoration-green-500' : 'bg-white text-gray-800';
-                        const icon = isScanned ? '✓' : '⏳';
-                        
-                        listEl.innerHTML += `
-                            <li class="p-2 border rounded shadow-sm flex items-center gap-2 ${liClass} font-mono text-sm transition-colors">
-                                <span class="font-bold">${icon}</span>
-                                <span>${item.code}</span>
-                            </li>
-                        `;
-                    });
-                } else {
-                    closeScanner();
                 }
             });
         }
@@ -377,55 +349,72 @@
             document.getElementById('dashboard-screen').classList.remove('hidden');
         }
 
-        document.getElementById('scanner-input').addEventListener('keypress', function(e) {
+        // Инициализация звука перенесена внутрь обработчика нажатия кнопок на сканере
+        document.getElementById('scanner-input').addEventListener('keypress', async function(e) {
+            initAudio(); // 100% разблокировка звука при вводе
             if (e.key === 'Enter') {
                 e.preventDefault();
-                processBarcode(this.value.trim());
-                this.value = '';
+                await processBarcode(this.value.trim());
+                this.value = ''; // Очищаем поле только после обработки
             }
         });
 
         async function processBarcode(code) {
             if (!code || !currentScanId) return;
 
-            const docRef = db.collection('manifests').doc(currentScanId);
-            const docSnap = await docRef.get();
-            if (!docSnap.exists) return;
+            try {
+                const docRef = db.collection('manifests').doc(currentScanId);
+                const docSnap = await docRef.get();
+                if (!docSnap.exists) {
+                    showMessage("Ошибка: Ведомость не найдена в базе!");
+                    return;
+                }
 
-            const data = docSnap.data();
-            const items = data.items;
-            let alreadyScanned = false;
+                const data = docSnap.data();
+                const items = data.items;
+                let alreadyScanned = false;
 
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].code === code) {
-                    if (items[i].status === 'pending') {
-                        items[i].status = 'scanned';
-                        items[i].scannedBy = currentUser.email;
-                        items[i].scannedAt = new Date().toISOString();
-                        
-                        await docRef.update({ items: items });
-                        showSuccessFlash(code);
-                        return;
-                    } else {
-                        alreadyScanned = true;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].code === code) {
+                        if (items[i].status === 'pending') {
+                            
+                            items[i].status = 'scanned';
+                            items[i].scannedBy = currentUser.email;
+                            items[i].scannedAt = new Date().toISOString();
+                            
+                            // ДОЖИДАЕМСЯ успешной записи в БД
+                            await docRef.update({ items: items });
+                            
+                            // Показываем зеленый интерфейс ТОЛЬКО если запись успешна
+                            showSuccessFlash(code);
+                            return;
+                        } else {
+                            alreadyScanned = true;
+                        }
                     }
                 }
+
+                const errorMsg = alreadyScanned ? `Номер ${code} УЖЕ БЫЛ ЗАГРУЖЕН!` : `Номер ${code} ЧУЖОЙ (нет в ведомости)!`;
+                
+                const newError = {
+                    code: code,
+                    message: alreadyScanned ? 'Повторное сканирование' : 'Лишний номер',
+                    scannedBy: currentUser.email,
+                    scannedAt: new Date().toISOString()
+                };
+                
+                // Дожидаемся записи ошибки в БД
+                await docRef.update({
+                    errors: firebase.firestore.FieldValue.arrayUnion(newError)
+                });
+
+                // Показываем красную шторку ТОЛЬКО если ошибка записана успешно
+                showErrorOverlay(errorMsg);
+
+            } catch (error) {
+                console.error("Ошибка сканирования:", error);
+                showMessage("Сбой связи с базой данных:\n" + error.message);
             }
-
-            const errorMsg = alreadyScanned ? `Номер ${code} УЖЕ БЫЛ ЗАГРУЖЕН!` : `Номер ${code} ЧУЖОЙ (нет в ведомости)!`;
-            
-            const newError = {
-                code: code,
-                message: alreadyScanned ? 'Повторное сканирование' : 'Лишний номер',
-                scannedBy: currentUser.email,
-                scannedAt: new Date().toISOString()
-            };
-            
-            await docRef.update({
-                errors: firebase.firestore.FieldValue.arrayUnion(newError)
-            });
-
-            showErrorOverlay(errorMsg);
         }
 
         function showSuccessFlash(code) {
@@ -434,7 +423,7 @@
             area.classList.remove('flash-green');
             void area.offsetWidth; 
             area.classList.add('flash-green');
-            document.getElementById('scan-last-result').innerHTML = `<span class="text-green-600">✔ ${code}</span>`;
+            document.getElementById('scan-last-result').innerHTML = `<span class="text-green-600">✔ ${code} загружен</span>`;
         }
 
         function showErrorOverlay(message) {
@@ -449,7 +438,6 @@
             document.getElementById('scanner-input').focus(); 
         }
 
-        // --- ПЕЧАТЬ PDF ---
         function generatePDF() {
             if (!currentManifestDoc) return;
             const data = currentManifestDoc;
@@ -466,7 +454,7 @@
                 <p><strong>Ведомость создал:</strong> ${data.creatorEmail}</p>
                 <p><strong>Статус:</strong> Всего: ${total} шт. / Загружено: ${scanned} шт. / Не загружено: ${pending} шт.</p>
                 
-                <h3 style="margin-top:20px; font-family: sans-serif;">Список отправлений:</h3>
+                <h3 style="margin-top:20px; font-family: sans-serif;">Список загруженных отправлений:</h3>
                 <table class="print-table">
                     <thead><tr><th>№</th><th>Номер манифеста</th><th>Статус</th><th>Сотрудник (Склад)</th></tr></thead>
                     <tbody>
@@ -502,8 +490,8 @@
 
             const printArea = document.getElementById('print-area');
             printArea.innerHTML = html;
-            printArea.classList.remove('hidden');
             
+            printArea.classList.remove('hidden');
             window.print();
         }
 
