@@ -5,13 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Управление Загрузкой Склада</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase (используем версию 8 для простоты интеграции в один файл) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <style>
-        /* Анимации для сканера */
         @keyframes flashGreen {
             0% { background-color: #22c55e; }
             100% { background-color: transparent; }
@@ -23,34 +21,26 @@
         .flash-green { animation: flashGreen 0.8s ease-out; }
         .flash-red { animation: flashRed 1s ease-out; }
         
-        /* Экран ошибки на весь экран */
         #error-overlay {
             display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(239, 68, 68, 0.95);
-            z-index: 50;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: white;
+            z-index: 50; justify-content: center; align-items: center;
+            flex-direction: column; color: white;
         }
 
-        /* Стили для печати (PDF) */
+        /* Обновленные стили для печати */
         @media print {
-            body * { visibility: hidden; }
-            #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; left: 0; top: 0; width: 100%; color: black; }
-            .no-print { display: none !important; }
+            body > *:not(#print-area) { display: none !important; }
+            #print-area { display: block !important; position: static; width: 100%; color: black; padding: 20px; }
             .print-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             .print-table th, .print-table td { border: 1px solid #000; padding: 8px; text-align: left; }
             .print-table th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; }
             .signature-block { margin-top: 50px; display: flex; justify-content: space-between; }
-            .signature-line { border-bottom: 1px solid black; width: 200px; display: inline-block; }
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col">
+<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col" onclick="initAudio()">
 
     <!-- Экран входа -->
     <div id="login-screen" class="absolute inset-0 z-40 bg-gray-100 flex items-center justify-center">
@@ -58,7 +48,7 @@
             <h2 class="text-2xl font-bold mb-6 text-center">Вход в систему</h2>
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-1">Email</label>
-                <input type="email" id="email" class="w-full border rounded p-2" placeholder="ivan@sklad.local">
+                <input type="email" id="email" class="w-full border rounded p-2" placeholder="email@sklad.ru">
             </div>
             <div class="mb-6">
                 <label class="block text-sm font-medium mb-1">Пароль</label>
@@ -69,7 +59,7 @@
         </div>
     </div>
 
-    <!-- Верхняя панель (Header) -->
+    <!-- Верхняя панель -->
     <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center no-print">
         <div>
             <h1 class="text-xl font-bold">Склад - Загрузка</h1>
@@ -78,7 +68,7 @@
         <button onclick="logout()" class="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded">Выйти</button>
     </header>
 
-    <!-- Главный экран (Список ведомостей) -->
+    <!-- Главный экран -->
     <div id="dashboard-screen" class="flex-1 overflow-auto p-4 hidden no-print">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold">Автомобили на загрузку</h2>
@@ -86,19 +76,15 @@
                 + Создать ведомость
             </button>
         </div>
-
-        <div id="manifests-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- Сюда будут загружаться автомобили -->
-        </div>
+        <div id="manifests-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     </div>
 
-    <!-- Форма создания ведомости (Офис) -->
+    <!-- Форма создания -->
     <div id="create-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 flex items-center justify-center no-print">
         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
             <h3 class="text-xl font-bold mb-4">Новая ведомость</h3>
-            <input type="text" id="new-car-number" placeholder="Номер автомобиля (напр. АА 1234 ВВ)" class="w-full border rounded p-2 mb-4 font-bold text-lg">
-            <label class="block text-sm font-medium mb-1">Список номеров (манифестов)</label>
-            <textarea id="new-manifests-list" rows="6" placeholder="Вставьте номера сюда...&#10;Каждый номер с новой строки" class="w-full border rounded p-2 mb-4 font-mono text-sm"></textarea>
+            <input type="text" id="new-car-number" placeholder="Номер авто (АА 1234 ВВ)" class="w-full border rounded p-2 mb-4 font-bold text-lg">
+            <textarea id="new-manifests-list" rows="6" placeholder="Вставьте номера сюда..." class="w-full border rounded p-2 mb-4 font-mono text-sm"></textarea>
             <div class="flex justify-end gap-2">
                 <button onclick="hideCreateForm()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Отмена</button>
                 <button onclick="saveManifest()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-bold">Создать</button>
@@ -106,50 +92,42 @@
         </div>
     </div>
 
-    <!-- Экран сканирования (Склад) -->
+    <!-- Экран сканирования -->
     <div id="scan-screen" class="hidden flex-1 flex flex-col no-print bg-white">
         <div class="bg-gray-200 p-4 flex justify-between items-center border-b">
             <div>
                 <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded font-bold mr-3">← Назад</button>
                 <span class="text-xl font-bold" id="scan-car-number">АВТОМОБИЛЬ</span>
             </div>
-            <div class="flex gap-3">
-                <div class="text-right">
+            <div class="flex gap-3 items-center">
+                <div class="text-right mr-4">
                     <div class="text-2xl font-bold text-blue-600"><span id="scan-count">0</span> / <span id="scan-total">0</span></div>
                     <div class="text-xs text-gray-500">загружено</div>
                 </div>
-                <button onclick="generatePDF()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                    Акт
+                <button onclick="generatePDF()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold">
+                    Печать Акта
                 </button>
             </div>
         </div>
 
         <div id="scan-flash-area" class="p-6 flex-1 flex flex-col items-center justify-center transition-colors">
-            <h3 class="text-lg mb-2 text-gray-600 font-medium">Режим сканирования</h3>
-            <!-- Огромное поле для ввода сканером -->
             <input type="text" id="scanner-input" autocomplete="off" autofocus class="w-full max-w-2xl text-center text-4xl font-mono border-4 border-blue-400 rounded-lg p-6 shadow-inner focus:outline-none focus:border-blue-600 focus:bg-blue-50" placeholder="Сканируйте штрих-код...">
-            <button onclick="document.getElementById('scanner-input').focus()" class="mt-4 text-sm text-blue-500 underline">Вернуть фокус сканеру</button>
-            
             <div id="scan-last-result" class="mt-8 text-2xl font-bold h-10"></div>
         </div>
     </div>
 
-    <!-- Красная шторка ошибки сканирования -->
+    <!-- Красная шторка ошибки -->
     <div id="error-overlay">
-        <svg class="w-32 h-32 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
         <h1 class="text-6xl font-bold mb-4">ОШИБКА!</h1>
-        <p class="text-2xl mb-8 text-center px-4" id="error-message">Неправильный номер или уже отсканирован</p>
-        <button onclick="closeErrorOverlay()" class="bg-white text-red-600 font-bold py-4 px-12 rounded-full text-2xl shadow-lg hover:bg-gray-100">ПОНЯТНО (Закрыть)</button>
+        <p class="text-2xl mb-8 text-center px-4" id="error-message">Неправильный номер</p>
+        <button onclick="closeErrorOverlay()" class="bg-white text-red-600 font-bold py-4 px-12 rounded-full text-2xl hover:bg-gray-100">ЗАКРЫТЬ</button>
     </div>
 
-    <!-- Зона для печати (PDF Акт) - скрыта на экране -->
-    <div id="print-area" class="hidden bg-white p-8">
-        <!-- Сюда скрипт сгенерирует документ -->
-    </div>
+    <!-- Зона для печати -->
+    <div id="print-area" class="hidden bg-white"></div>
 
     <script>
-        // --- 1. НАСТРОЙКИ FIREBASE (ВАШИ КЛЮЧИ) ---
+        // ВАШИ КЛЮЧИ БАЗЫ ДАННЫХ
         const firebaseConfig = {
           apiKey: "AIzaSyBUp11R-Sq46IrW9lwH5uFjXXzli5OASsU",
           authDomain: "sklad-app-b04e3.firebaseapp.com",
@@ -159,7 +137,6 @@
           appId: "1:433669721018:web:ec68089819da1d5f952b83"
         };
 
-        // Инициализация
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
@@ -167,14 +144,23 @@
         let currentUser = null;
         let unsubscribeManifests = null;
         let unsubscribeCurrentScan = null;
-        let currentManifestDoc = null; // Хранит текущие данные для печати
+        let currentManifestDoc = null; 
         
-        // --- ЗВУКИ (WEB AUDIO API) ---
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const audioCtx = new AudioContext();
+        // --- ИСПРАВЛЕННЫЙ ЗВУК ---
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
 
         function playTone(freq, type, duration, vol = 1) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+            initAudio(); // Принудительная активация перед каждым звуком
+            if(!audioCtx) return;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = type;
@@ -188,16 +174,16 @@
         }
 
         function playSuccessSound() {
-            playTone(880, 'sine', 0.1, 0.5); // Короткий Дзинь
+            playTone(880, 'sine', 0.1, 0.5); 
             setTimeout(() => playTone(1108, 'sine', 0.2, 0.5), 100);
         }
 
         function playErrorSound() {
-            playTone(150, 'sawtooth', 0.4, 1); // Резкий неприятный звук
+            playTone(150, 'sawtooth', 0.4, 1); 
             playTone(155, 'sawtooth', 0.4, 1);
         }
 
-        // --- АВТОРИЗАЦИЯ ---
+        // --- АВТОРИЗАЦИЯ И ЛОГИКА ---
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
@@ -214,48 +200,41 @@
         });
 
         function login() {
-            const e = document.getElementById('email').value;
-            const p = document.getElementById('password').value;
+            initAudio();
+            const e = document.getElementById('email').value.trim();
+            const p = document.getElementById('password').value.trim();
             const err = document.getElementById('login-error');
             auth.signInWithEmailAndPassword(e, p).catch(error => {
-                err.innerText = "Ошибка: " + error.message;
+                err.innerText = "Ошибка: Неверный логин или пароль";
                 err.classList.remove('hidden');
             });
         }
 
-        function logout() {
-            auth.signOut();
-        }
+        function logout() { auth.signOut(); }
 
-        // --- ГЛАВНЫЙ ЭКРАН (ОФИС) ---
         function showCreateForm() {
             document.getElementById('create-modal').classList.remove('hidden');
             document.getElementById('new-car-number').value = '';
             document.getElementById('new-manifests-list').value = '';
         }
 
-        function hideCreateForm() {
-            document.getElementById('create-modal').classList.add('hidden');
-        }
+        function hideCreateForm() { document.getElementById('create-modal').classList.add('hidden'); }
 
         async function saveManifest() {
             const car = document.getElementById('new-car-number').value.trim();
             const text = document.getElementById('new-manifests-list').value.trim();
             if (!car || !text) return alert("Заполните номер авто и список!");
 
-            // Разбиваем текст на строки, убираем пустые
             const items = text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
             
-            const manifestData = {
+            await db.collection('manifests').add({
                 carNumber: car,
                 creatorEmail: currentUser.email,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 items: items.map(code => ({ code: code, status: 'pending', scannedBy: null, scannedAt: null })),
                 errors: [],
-                status: 'pending' // pending или completed
-            };
-
-            await db.collection('manifests').add(manifestData);
+                status: 'pending'
+            });
             hideCreateForm();
         }
 
@@ -273,11 +252,6 @@
                         const total = data.items.length;
                         const scanned = data.items.filter(i => i.status === 'scanned').length;
                         const isCompleted = total > 0 && scanned === total;
-                        
-                        // Авто-обновление статуса в базе (опционально)
-                        if (isCompleted && data.status !== 'completed') {
-                            db.collection('manifests').doc(doc.id).update({ status: 'completed' });
-                        }
 
                         const color = isCompleted ? 'bg-green-100 border-green-500' : 'bg-red-50 border-red-500';
                         const textColor = isCompleted ? 'text-green-700' : 'text-red-700';
@@ -301,13 +275,10 @@
                 });
         }
 
-        // --- СКАНЕР (СКЛАД) ---
         let currentScanId = null;
 
         function openScanner(id, carNumber) {
-            // Включаем AudioContext (требование браузеров)
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
+            initAudio(); // Пробуждаем звук при клике на ведомость
             currentScanId = id;
             document.getElementById('dashboard-screen').classList.add('hidden');
             document.getElementById('scan-screen').classList.remove('hidden');
@@ -317,11 +288,10 @@
             input.value = '';
             input.focus();
 
-            // Подписка на изменения конкретной ведомости в реальном времени
             if (unsubscribeCurrentScan) unsubscribeCurrentScan();
             unsubscribeCurrentScan = db.collection('manifests').doc(id).onSnapshot(doc => {
                 if(doc.exists) {
-                    currentManifestDoc = doc.data(); // Сохраняем для PDF
+                    currentManifestDoc = doc.data(); 
                     const data = doc.data();
                     const total = data.items.length;
                     const scanned = data.items.filter(i => i.status === 'scanned').length;
@@ -338,12 +308,11 @@
             document.getElementById('dashboard-screen').classList.remove('hidden');
         }
 
-        // Обработка ввода со сканера (сканер обычно вводит текст и нажимает Enter)
         document.getElementById('scanner-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 processBarcode(this.value.trim());
-                this.value = ''; // Очищаем для следующего сканирования
+                this.value = '';
             }
         });
 
@@ -356,33 +325,26 @@
 
             const data = docSnap.data();
             const items = data.items;
-            let itemFound = false;
             let alreadyScanned = false;
 
-            // Ищем штрихкод в списке
             for (let i = 0; i < items.length; i++) {
                 if (items[i].code === code) {
-                    itemFound = true;
                     if (items[i].status === 'pending') {
-                        // УСПЕХ: Нашли и он еще не отсканирован
                         items[i].status = 'scanned';
                         items[i].scannedBy = currentUser.email;
                         items[i].scannedAt = new Date().toISOString();
                         
                         await docRef.update({ items: items });
-                        
                         showSuccessFlash(code);
-                        return; // Выходим
+                        return;
                     } else {
                         alreadyScanned = true;
                     }
                 }
             }
 
-            // ОШИБКА: Если не нашли или уже отсканирован
             const errorMsg = alreadyScanned ? `Номер ${code} УЖЕ БЫЛ ЗАГРУЖЕН!` : `Номер ${code} ЧУЖОЙ (нет в ведомости)!`;
             
-            // Записываем ошибку в базу
             const newError = {
                 code: code,
                 message: alreadyScanned ? 'Повторное сканирование' : 'Лишний номер',
@@ -397,32 +359,28 @@
             showErrorOverlay(errorMsg);
         }
 
-        // --- ВИЗУАЛИЗАЦИЯ И ЗВУКИ ---
         function showSuccessFlash(code) {
             playSuccessSound();
             const area = document.getElementById('scan-flash-area');
             area.classList.remove('flash-green');
-            void area.offsetWidth; // Магия для перезапуска анимации
+            void area.offsetWidth; 
             area.classList.add('flash-green');
-            
-            const resultDiv = document.getElementById('scan-last-result');
-            resultDiv.innerHTML = `<span class="text-green-600">✔ ${code} загружен</span>`;
+            document.getElementById('scan-last-result').innerHTML = `<span class="text-green-600">✔ ${code} загружен</span>`;
         }
 
         function showErrorOverlay(message) {
             playErrorSound();
             document.getElementById('error-message').innerText = message;
             document.getElementById('error-overlay').style.display = 'flex';
-            document.getElementById('scanner-input').blur(); // Снимаем фокус
+            document.getElementById('scanner-input').blur(); 
         }
 
         function closeErrorOverlay() {
             document.getElementById('error-overlay').style.display = 'none';
-            const input = document.getElementById('scanner-input');
-            input.focus(); // Возвращаем фокус сканеру
+            document.getElementById('scanner-input').focus(); 
         }
 
-        // --- ГЕНЕРАЦИЯ PDF (ПЕЧАТЬ) ---
+        // --- ИСПРАВЛЕННАЯ ПЕЧАТЬ PDF ---
         function generatePDF() {
             if (!currentManifestDoc) return;
             const data = currentManifestDoc;
@@ -430,7 +388,6 @@
             const total = data.items.length;
             const scanned = data.items.filter(i => i.status === 'scanned').length;
             const pending = total - scanned;
-            
             const dateStr = new Date().toLocaleString('ru-RU');
 
             let html = `
@@ -446,7 +403,6 @@
                     <tbody>
             `;
 
-            // Заполняем таблицу
             data.items.forEach((item, index) => {
                 const statusTxt = item.status === 'scanned' ? 'ЗАГРУЖЕНО' : 'ОЖИДАЕТ';
                 const emp = item.scannedBy ? item.scannedBy : '-';
@@ -455,7 +411,6 @@
 
             html += `</tbody></table>`;
 
-            // Если есть ошибки, добавляем их
             if (data.errors && data.errors.length > 0) {
                 html += `
                     <h3 style="margin-top:30px; color: red; font-family: sans-serif;">Ошибочные сканирования:</h3>
@@ -469,24 +424,26 @@
                 html += `</tbody></table>`;
             }
 
-            // Подписи
             html += `
                 <div class="signature-block">
-                    <div>
-                        <p>Сдал (Склад): _______________________</p>
-                    </div>
-                    <div>
-                        <p>Принял (Водитель): _______________________</p>
-                    </div>
+                    <div><p>Сдал (Склад): _______________________</p></div>
+                    <div><p>Принял (Водитель): _______________________</p></div>
                 </div>
             `;
 
             const printArea = document.getElementById('print-area');
             printArea.innerHTML = html;
             
-            // Вызываем системное окно печати (в котором можно сохранить как PDF)
+            // Секрет решения проблемы с пустотой: временно делаем зону видимой!
+            printArea.classList.remove('hidden');
+            
             window.print();
         }
+
+        // Прячем зону печати обратно после того, как системное окно закроется
+        window.onafterprint = function() {
+            document.getElementById('print-area').classList.add('hidden');
+        };
     </script>
 </body>
 </html>
