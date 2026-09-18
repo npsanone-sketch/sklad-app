@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Контроль Загрузки Склада</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            -webkit-tap-highlight-color: transparent;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        @keyframes flash-red {
+            0% { background-color: rgba(220, 38, 38, 0); }
+            10%, 90% { background-color: rgba(220, 38, 38, 1); }
+            100% { background-color: rgba(220, 38, 38, 0); }
+        }
+        .error-flash { animation: flash-red 1.5s ease-out forwards; }
+
+        @media print {
+            body { background-color: white; }
+            body > *:not(#print-report) { display: none !important; }
+            #print-report { display: block !important; }
+            @page { margin: 15mm; size: A4; }
+        }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Navigation -->
+    <header class="bg-blue-800 text-white shadow-md z-10 shrink-0">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold truncate">🚚 Складской Контроль</h1>
+            <div class="flex items-center gap-4">
+                <div id="user-status" class="text-xs opacity-75 flex items-center gap-2">
+                    <span id="connection-indicator" class="w-2 h-2 rounded-full bg-red-400"></span>
+                    <span id="connection-text">Оффлайн</span>
+                </div>
+                <button id="btn-logout" class="hidden text-xs bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded transition-colors">Выйти</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-hidden relative w-full max-w-4xl mx-auto flex flex-col">
+        
+        <!-- Loading overlay -->
+        <div id="loading-overlay" class="absolute inset-0 bg-white/90 z-40 flex flex-col items-center justify-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800 mb-4"></div>
+            <p class="text-gray-600 font-medium">Загрузка данных...</p>
+        </div>
+
+        <!-- Auth View -->
+        <div id="view-auth" class="flex-1 overflow-y-auto p-4 hidden flex-col items-center justify-center">
+            <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+                <h2 class="text-2xl font-bold text-center mb-6 text-gray-800">Вход в систему</h2>
+                
+                <div id="auth-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4"></div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email пользователя</label>
+                        <input type="email" id="auth-email" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="sklad@company.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
+                        <input type="password" id="auth-password" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="••••••••">
+                    </div>
+                    
+                    <div class="flex gap-3 pt-2">
+                        <button id="btn-login" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium shadow transition-colors">Войти</button>
+                        <button id="btn-register" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 rounded-lg font-medium shadow-sm transition-colors">Регистрация</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard View (Office & Lists) -->
+        <div id="view-dashboard" class="flex-1 overflow-y-auto p-4 hidden flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Ведомости</h2>
+                <button id="btn-show-create" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow transition-colors flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="hidden sm:inline">Создать ведомость</span>
+                </button>
+            </div>
+            
+            <div id="trucks-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20"></div>
+            
+            <div id="empty-state" class="hidden flex-col items-center justify-center py-12 text-gray-500">
+                <p class="text-lg">Нет активных ведомостей</p>
+                <p class="text-sm">Нажмите «Создать ведомость» для начала работы</p>
+            </div>
+        </div>
+
+        <!-- Scanning View (Warehouse) -->
+        <div id="view-scan" class="flex-1 flex flex-col hidden overflow-hidden bg-white">
+            <div class="p-4 border-b bg-gray-50 flex items-center justify-between shrink-0">
+                <button id="btn-back" class="text-gray-600 hover:text-gray-900 flex items-center gap-1 py-2 pr-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    Назад
+                </button>
+                <h2 id="scan-truck-title" class="text-xl font-bold text-gray-800 truncate px-2">Авто: ...</h2>
+                <div class="flex items-center gap-2">
+                    <div id="scan-progress-badge" class="font-bold text-sm px-3 py-1 rounded-full bg-gray-200">0/0</div>
+                    <button id="btn-print-report" class="text-blue-600 hover:text-blue-800 p-2 bg-blue-100 rounded-lg transition-colors shadow-sm" title="Печать акта">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scanner Input -->
+            <div class="p-4 bg-white shadow-sm shrink-0 z-10">
+                <div class="relative">
+                    <input type="text" id="scanner-input" class="w-full text-lg font-mono p-4 border-2 border-blue-400 rounded-xl focus:outline-none focus:border-blue-600 transition-all uppercase placeholder-gray-300" placeholder="Штрих-код сюда..." autocomplete="off">
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                <div id="manifest-list" class="space-y-2 pb-20"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Create Manifest Modal -->
+    <div id="modal-create" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-full">
+            <div class="p-4 border-b flex justify-between items-center shrink-0">
+                <h3 class="text-xl font-bold text-gray-800">Новая ведомость</h3>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Номер автомобиля</label>
+                    <input type="text" id="input-truck-number" class="w-full p-3 border border-gray-300 rounded-lg uppercase" placeholder="АВ 1234 СВ">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Номера манифестов</label>
+                    <textarea id="input-manifests" rows="6" class="w-full p-3 border border-gray-300 rounded-lg font-mono text-sm" placeholder="1234567&#10;9876543"></textarea>
+                </div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-xl">
+                <button id="btn-cancel-create" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium">Отмена</button>
+                <button id="btn-save-manifest" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Error -->
+    <div id="error-overlay" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center p-6 text-center pointer-events-none">
+        <div id="error-content" class="bg-white/10 backdrop-blur-sm rounded-3xl p-8 border-4 border-white shadow-2xl transform scale-90 transition-transform">
+            <h1 class="text-4xl sm:text-6xl font-black text-white mb-2 tracking-wide uppercase">ОШИБКА</h1>
+            <p id="error-message" class="text-xl sm:text-3xl text-white font-bold opacity-90">Лишний номер!</p>
+        </div>
+    </div>
+
+    <!-- Print Report -->
+    <div id="print-report" class="hidden text-black font-sans bg-white"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-warehouse-app';
+        let firebaseConfig = {};
+        try { firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {}; } 
+        catch (e) {}
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let allTrucks = [];
+        let currentActiveTruck = null;
+        let unsubscribeTrucks = null;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type) {
+            initAudio();
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            
+            if (type === 'success') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(800, now);
+                oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gainNode.gain.setValueAtTime(0.5, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                oscillator.start(now); oscillator.stop(now + 0.15);
+            } else {
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(150, now);
+                oscillator.frequency.linearRampToValueAtTime(100, now + 0.5);
+                gainNode.gain.setValueAtTime(0.8, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                oscillator.start(now); oscillator.stop(now + 0.6);
+            }
+        }
+
+        function triggerErrorUI(message) {
+            playSound('error');
+            const overlay = document.getElementById('error-overlay');
+            document.getElementById('error-message').textContent = message;
+            overlay.classList.remove('hidden');
+            overlay.classList.add('error-flash');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('error-flash');
+                if(currentActiveTruck) document.getElementById('scanner-input').focus();
+            }, 1500);
+        }
+
+        function triggerSuccessUI() {
+            playSound('success');
+            const input = document.getElementById('scanner-input');
+            input.classList.add('bg-green-100', 'border-green-500');
+            setTimeout(() => input.classList.remove('bg-green-100', 'border-green-500'), 300);
+        }
+
+        function showView(viewName) {
+            document.getElementById('view-auth').classList.add('hidden');
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-scan').classList.add('hidden');
+            document.getElementById('btn-logout').classList.add('hidden');
+            currentActiveTruck = null;
+            
+            if (viewName === 'auth') {
+                document.getElementById('view-auth').classList.remove('hidden');
+                document.getElementById('view-auth').classList.add('flex');
+            } else if (viewName === 'dashboard') {
+                document.getElementById('view-dashboard').classList.remove('hidden');
+                document.getElementById('view-dashboard').classList.add('flex');
+                document.getElementById('btn-logout').classList.remove('hidden');
+            } else if (viewName === 'scan') {
+                document.getElementById('view-scan').classList.remove('hidden');
+                document.getElementById('btn-logout').classList.remove('hidden');
+            }
+        }
+
+        // --- AUTH LOGIC ---
+        onAuthStateChanged(auth, (user) => {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            if (user) {
+                currentUser = user;
+                document.getElementById('connection-indicator').classList.replace('bg-red-400', 'bg-green-400');
+                document.getElementById('connection-text').textContent = user.email;
+                startListeningToTrucks();
+                showView('dashboard');
+            } else {
+                currentUser = null;
+                document.getElementById('connection-indicator').classList.replace('bg-green-400', 'bg-red-400');
+                document.getElementById('connection-text').textContent = 'Оффлайн';
+                if(unsubscribeTrucks) unsubscribeTrucks();
+                showView('auth');
+            }
+        });
+
+        const authErrorEl = document.getElementById('auth-error');
+        const getEmailPass = () => {
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+            if(!email || !password) {
+                authErrorEl.textContent = 'Введите email и пароль';
+                authErrorEl.classList.remove('hidden');
+                return null;
+            }
+            return {email, password};
+        };
+
+        document.getElementById('btn-login').onclick = async () => {
+            const creds = getEmailPass();
+            if(!creds) return;
+            try {
+                await signInWithEmailAndPassword(auth, creds.email, creds.password);
+                authErrorEl.classList.add('hidden');
+            } catch (err) {
+                authErrorEl.textContent = 'Ошибка входа: ' + err.message;
+                authErrorEl.classList.remove('hidden');
+            }
+        };
+
+        document.getElementById('btn-register').onclick = async () => {
+            const creds = getEmailPass();
+            if(!creds) return;
+            try {
+                await createUserWithEmailAndPassword(auth, creds.email, creds.password);
+                authErrorEl.classList.add('hidden');
+            } catch (err) {
+                authErrorEl.textContent = 'Ошибка регистрации: ' + err.message;
+                authErrorEl.classList.remove('hidden');
+            }
+        };
+
+        document.getElementById('btn-logout').onclick = () => {
+            signOut(auth);
+        };
+
+        // --- CORE LOGIC ---
+        const getTrucksCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'truck_manifests');
+        const getTruckDocRef = (id) => doc(db, 'artifacts', appId, 'public', 'data', 'truck_manifests', id);
+
+        function startListeningToTrucks() {
+            if (unsubscribeTrucks) unsubscribeTrucks();
+            unsubscribeTrucks = onSnapshot(getTrucksCollectionRef(), (snapshot) => {
+                allTrucks = [];
+                snapshot.forEach(doc => allTrucks.push({ id: doc.id, ...doc.data() }));
+                allTrucks.sort((a, b) => b.createdAt - a.createdAt);
+                renderDashboard();
+                if (currentActiveTruck) {
+                    const updated = allTrucks.find(t => t.id === currentActiveTruck);
+                    if (updated) renderScanView(updated);
+                    else showView('dashboard');
+                }
+            });
+        }
+
+        function calculateProgress(items) {
+            if (!items) return { total: 0, loaded: 0, completed: false };
+            const loaded = items.filter(i => i.isLoaded).length;
+            return { total: items.length, loaded, completed: loaded === items.length && items.length > 0 };
+        }
+
+        function renderDashboard() {
+            const container = document.getElementById('trucks-container');
+            container.innerHTML = '';
+            
+            if (allTrucks.length === 0) {
+                document.getElementById('empty-state').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('empty-state').classList.add('hidden');
+            
+            allTrucks.forEach(truck => {
+                const prog = calculateProgress(truck.items);
+                const bgClass = prog.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200';
+                
+                const card = document.createElement('div');
+                card.className = `border rounded-xl p-5 cursor-pointer shadow-sm hover:shadow-md relative ${bgClass}`;
+                card.onclick = () => {
+                    currentActiveTruck = truck.id;
+                    renderScanView(truck);
+                    showView('scan');
+                    setTimeout(() => document.getElementById('scanner-input').focus(), 100);
+                };
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-xl font-bold uppercase tracking-wider">${escapeHtml(truck.truckNumber)}</h3>
+                        <div class="font-bold bg-white/50 px-2 rounded">${prog.loaded}/${prog.total}</div>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-2">Создал: ${escapeHtml(truck.createdByEmail || truck.createdBy)}</p>
+                    <button class="absolute top-2 right-2 text-red-500 p-2 hidden delete-btn" data-id="${truck.id}">Удалить</button>
+                `;
+                container.appendChild(card);
+            });
+
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.onclick = async (e) => {
+                    e.stopPropagation();
+                    try { await deleteDoc(getTruckDocRef(e.target.getAttribute('data-id'))); } catch(err){}
+                }
+            });
+        }
+
+        // --- CREATE MODAL ---
+        document.getElementById('btn-show-create').onclick = () => {
+            document.getElementById('input-truck-number').value = '';
+            document.getElementById('input-manifests').value = '';
+            document.getElementById('modal-create').classList.remove('hidden');
+        };
+
+        const closeModal = () => document.getElementById('modal-create').classList.add('hidden');
+        document.getElementById('btn-cancel-create').onclick = closeModal;
+
+        document.getElementById('btn-save-manifest').onclick = async () => {
+            if (!currentUser) return;
+            const tNum = document.getElementById('input-truck-number').value.trim();
+            const mRaw = document.getElementById('input-manifests').value.trim();
+            if (!tNum) return;
+
+            const mArr = [...new Set(mRaw.split(/[\n, ]+/).map(s => s.trim()).filter(s => s.length > 0))];
+            const items = mArr.map(code => ({ code: code.toUpperCase(), isLoaded: false, scannedAt: null, scannedBy: null }));
+
+            try {
+                await setDoc(doc(getTrucksCollectionRef()), {
+                    truckNumber: tNum.toUpperCase(),
+                    items: items,
+                    errorScans: [],
+                    createdAt: Date.now(),
+                    createdBy: currentUser.uid,
+                    createdByEmail: currentUser.email // Save email for tracking
+                });
+                closeModal();
+            } catch (err) { triggerErrorUI("Ошибка сохранения"); }
+        };
+
+        // --- SCANNING ---
+        document.getElementById('btn-back').onclick = () => showView('dashboard');
+        
+        function renderScanView(truck) {
+            document.getElementById('scan-truck-title').textContent = `Авто: ${truck.truckNumber}`;
+            const prog = calculateProgress(truck.items);
+            document.getElementById('scan-progress-badge').textContent = `${prog.loaded}/${prog.total}`;
+            
+            document.getElementById('btn-print-report').onclick = () => generateReport(truck);
+
+            const list = document.getElementById('manifest-list');
+            list.innerHTML = '';
+            
+            [...(truck.items || [])].sort((a, b) => a.isLoaded === b.isLoaded ? a.code.localeCompare(b.code) : a.isLoaded ? 1 : -1).forEach(item => {
+                const el = document.createElement('div');
+                if (item.isLoaded) {
+                    el.className = 'p-3 bg-green-50 border border-green-200 rounded-lg flex justify-between items-center';
+                    el.innerHTML = `
+                        <div>
+                            <div class="font-bold text-green-900">${escapeHtml(item.code)}</div>
+                            <div class="text-xs text-green-700">Загрузил: ${escapeHtml(item.scannedBy)}</div>
+                        </div>
+                        <button class="text-red-400 px-2 undo-btn" data-code="${item.code}">Отмена</button>
+                    `;
+                } else {
+                    el.className = 'p-3 bg-white border border-gray-200 border-l-4 border-l-blue-400 rounded-lg flex justify-between items-center';
+                    el.innerHTML = `<div class="font-bold text-gray-700">${escapeHtml(item.code)}</div><div class="text-xs text-gray-400">Ожидание</div>`;
+                }
+                list.appendChild(el);
+            });
+
+            document.querySelectorAll('.undo-btn').forEach(btn => {
+                btn.onclick = async (e) => {
+                    const code = e.target.getAttribute('data-code');
+                    const idx = truck.items.findIndex(i => i.code === code);
+                    if (idx > -1) {
+                        truck.items[idx].isLoaded = false;
+                        truck.items[idx].scannedBy = null;
+                        try { await updateDoc(getTruckDocRef(truck.id), { items: truck.items }); } catch(err){}
+                    }
+                };
+            });
+        }
+
+        const scannerInput = document.getElementById('scanner-input');
+        scannerInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const code = scannerInput.value.trim().toUpperCase();
+                scannerInput.value = '';
+                if (code) await processScan(code);
+            }
+        });
+
+        async function processScan(code) {
+            const truck = allTrucks.find(t => t.id === currentActiveTruck);
+            if (!truck || !currentUser) return;
+
+            const idx = truck.items.findIndex(i => i.code === code);
+            
+            if (idx === -1) {
+                triggerErrorUI(`Лишний!\n${code}`);
+                const errors = truck.errorScans || [];
+                errors.push({ code: code, time: Date.now(), user: currentUser.email });
+                try { await updateDoc(getTruckDocRef(truck.id), { errorScans: errors }); } catch(err){}
+                return;
+            }
+
+            if (truck.items[idx].isLoaded) {
+                triggerErrorUI(`Уже загружен!`);
+                return;
+            }
+
+            truck.items[idx].isLoaded = true;
+            truck.items[idx].scannedAt = Date.now();
+            truck.items[idx].scannedBy = currentUser.email;
+            triggerSuccessUI();
+
+            try { await updateDoc(getTruckDocRef(truck.id), { items: truck.items }); } 
+            catch (err) { truck.items[idx].isLoaded = false; }
+        }
+
+        function escapeHtml(str) { return str ? str.toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") : ''; }
+
+        function generateReport(truck) {
+            const prog = calculateProgress(truck.items);
+            const errors = truck.errorScans || [];
+            const loadedItems = truck.items.filter(i => i.isLoaded);
+            const missingItems = truck.items.filter(i => !i.isLoaded);
+            
+            document.getElementById('print-report').innerHTML = `
+                <div style="max-width: 800px; margin: 0 auto; color: #1f2937;">
+                    <div style="border-bottom: 2px solid #1f2937; padding-bottom: 15px; margin-bottom: 25px; text-align: center;">
+                        <h1 style="font-size: 26px; font-weight: 800; text-transform: uppercase;">Акт загрузки</h1>
+                        <h2>Авто: ${escapeHtml(truck.truckNumber)}</h2>
+                        <p>Создатель ведомости: ${escapeHtml(truck.createdByEmail)}</p>
+                        <p>Дата: ${new Date().toLocaleString('ru-RU')}</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 30px; text-align: center;">
+                        <div style="padding: 15px; border: 1px solid #ccc; width: 31%;">План: ${prog.total}</div>
+                        <div style="padding: 15px; border: 1px solid #ccc; width: 31%;">Загружено: ${prog.loaded}</div>
+                        <div style="padding: 15px; border: 1px solid #ccc; width: 31%;">Ошибок: ${errors.length}</div>
+                    </div>
+
+                    <h3>Успешно загружено:</h3>
+                    <ul>${loadedItems.map(i => `<li><strong>${escapeHtml(i.code)}</strong> — загрузил: ${escapeHtml(i.scannedBy)}</li>`).join('')}</ul>
+
+                    ${missingItems.length ? `<h3>Незагруженный остаток:</h3><p>${missingItems.map(i => escapeHtml(i.code)).join(', ')}</p>` : ''}
+                    
+                    ${errors.length ? `<h3>Ошибочные сканирования:</h3>
+                        <ul>${errors.map(e => `<li><strong>${escapeHtml(e.code)}</strong> — ${new Date(e.time).toLocaleTimeString('ru-RU')} (${escapeHtml(e.user)})</li>`).join('')}</ul>
+                    ` : ''}
+                    
+                    <div style="margin-top: 50px; border-top: 1px solid #000; padding-top: 20px;">
+                        <p>Отчет сгенерировал (текущий пользователь): ${escapeHtml(currentUser.email)}</p>
+                        <p>Подпись ______________</p>
+                    </div>
+                </div>
+            `;
+            window.print();
+        }
+    </script>
+</body>
+</html>
