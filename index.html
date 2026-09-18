@@ -163,7 +163,7 @@
         let unsubscribeCurrentScan = null;
         let currentManifestDoc = null; 
         
-        // --- НОВЫЕ ПРОФЕССИОНАЛЬНЫЕ ЗВУКИ ---
+        // --- ЗВУК ---
         let audioCtx = null;
         
         function unlockAudio() {
@@ -198,21 +198,22 @@
         }
 
         function playSuccessSound() {
-            // Классический "Пик" терминала Zebra (высокий, короткий и звонкий)
-            playTone(2000, 'square', 0.1, 0.2); 
+            // СТАРЫЙ ЗВУК УСПЕХА (Двойной приятный Дзинь)
+            playTone(880, 'sine', 0.1, 0.5); 
+            setTimeout(() => playTone(1108, 'sine', 0.2, 0.5), 100);
         }
 
         function playErrorSound() {
-            // Пульсирующая тревожная сирена на 2 секунды (5 гудков подряд)
+            // НОВЫЙ ЗВУК ОШИБКИ (Тревожная 2-секундная сирена)
             for (let i = 0; i < 5; i++) {
                 setTimeout(() => {
                     playTone(250, 'square', 0.3, 0.5);
-                    playTone(255, 'sawtooth', 0.3, 0.5); // Диссонанс для неприятного звука
-                }, i * 400); // Интервал 0.4с * 5 раз = 2 секунды
+                    playTone(255, 'sawtooth', 0.3, 0.5);
+                }, i * 400); // 5 гудков * 0.4 сек = 2 секунды
             }
         }
 
-        // --- УМНЫЙ ПАРСЕР С ПАЛЛЕТАМИ ---
+        // --- СУПЕР УМНЫЙ ПАРСЕР ДАННЫХ ---
         function parseExcelData(text) {
             const lines = text.split('\n');
             const items = [];
@@ -222,29 +223,61 @@
                 line = line.trim();
                 if(!line) return;
 
-                const match = line.match(/(MF[A-Z0-9]+)\//i);
-                if (!match) return; 
-
-                const code = match[1].toUpperCase();
-                if (seen.has(code)) return; 
-                seen.add(code);
-
+                let code = "";
                 let brutto = "-", netto = "-", pcs = "-", totalPlaces = 1;
 
                 if (line.includes('\t')) {
+                    // Копирование из EXCEL таблицей
                     const cols = line.split('\t');
+                    if (cols.length >= 2) {
+                        // cols[0] = Страна (напр. PL), cols[1] = Номер (напр. MFPL0000034266/ biz)
+                        code = cols[1].split('/')[0].trim().toUpperCase();
+                    }
                     if (cols.length >= 8) {
                         totalPlaces = parseInt(cols[2], 10) || 1;
                         brutto = cols[4].trim() || "-";
                         netto = cols[5].trim() || "-";
                         pcs = cols[7].trim() || "-";
+                    } else if (cols.length >= 5) {
+                        totalPlaces = parseInt(cols[2], 10) || 1;
                     }
                 } else {
-                    const placesMatch = line.match(/(\d+)\s*paleta/i);
-                    if (placesMatch) {
-                        totalPlaces = parseInt(placesMatch[1], 10) || 1;
+                    // Копирование сплошным ТЕКСТОМ (без пробелов)
+                    const paletaMatch = line.match(/(.*?)(\d+)\s*paleta(.*)/i);
+                    if (paletaMatch) {
+                        let rawPre = paletaMatch[1];
+                        totalPlaces = parseInt(paletaMatch[2], 10) || 1;
+                        
+                        // Удаляем всё после слэша, если он есть
+                        if (rawPre.includes('/')) {
+                            rawPre = rawPre.split('/')[0];
+                        }
+                        rawPre = rawPre.trim();
+                        
+                        // Если вначале стоит 2 буквы страны (PL, DE, CZ, GB...) - отрезаем их
+                        if (/^[A-Za-z]{2}/.test(rawPre)) {
+                            rawPre = rawPre.substring(2);
+                        }
+                        code = rawPre.toUpperCase();
+                    } else {
+                        // Экстренный случай: просто ищем текст до слэша
+                        const slashMatch = line.match(/(.*?)\//);
+                        if (slashMatch) {
+                            let rawPre = slashMatch[1].trim();
+                            if (/^[A-Za-z]{2}/.test(rawPre)) {
+                                rawPre = rawPre.substring(2);
+                            }
+                            code = rawPre.toUpperCase();
+                        } else {
+                            code = line.toUpperCase();
+                        }
                     }
                 }
+
+                if (!code || code.length < 4) return;
+
+                if (seen.has(code)) return; 
+                seen.add(code);
 
                 items.push({
                     code: code,
