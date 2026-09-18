@@ -198,22 +198,20 @@
         }
 
         function playSuccessSound() {
-            // СТАРЫЙ ЗВУК УСПЕХА (Двойной приятный Дзинь)
             playTone(880, 'sine', 0.1, 0.5); 
             setTimeout(() => playTone(1108, 'sine', 0.2, 0.5), 100);
         }
 
         function playErrorSound() {
-            // НОВЫЙ ЗВУК ОШИБКИ (Тревожная 2-секундная сирена)
             for (let i = 0; i < 5; i++) {
                 setTimeout(() => {
                     playTone(250, 'square', 0.3, 0.5);
                     playTone(255, 'sawtooth', 0.3, 0.5);
-                }, i * 400); // 5 гудков * 0.4 сек = 2 секунды
+                }, i * 400); 
             }
         }
 
-        // --- СУПЕР УМНЫЙ ПАРСЕР ДАННЫХ ---
+        // --- УМНЫЙ НЕУБИВАЕМЫЙ ПАРСЕР ---
         function parseExcelData(text) {
             const lines = text.split('\n');
             const items = [];
@@ -227,56 +225,67 @@
                 let brutto = "-", netto = "-", pcs = "-", totalPlaces = 1;
 
                 if (line.includes('\t')) {
-                    // Копирование из EXCEL таблицей
-                    const cols = line.split('\t');
-                    if (cols.length >= 2) {
-                        // cols[0] = Страна (напр. PL), cols[1] = Номер (напр. MFPL0000034266/ biz)
-                        code = cols[1].split('/')[0].trim().toUpperCase();
+                    const cols = line.split('\t').map(c => c.trim());
+                    
+                    // Ищем код (самое длинное слово в первых трех колонках)
+                    let codeCol = "";
+                    for (let i = 0; i < Math.min(3, cols.length); i++) {
+                        if (cols[i].length > codeCol.length) {
+                            codeCol = cols[i];
+                        }
                     }
-                    if (cols.length >= 8) {
-                        totalPlaces = parseInt(cols[2], 10) || 1;
-                        brutto = cols[4].trim() || "-";
-                        netto = cols[5].trim() || "-";
-                        pcs = cols[7].trim() || "-";
-                    } else if (cols.length >= 5) {
-                        totalPlaces = parseInt(cols[2], 10) || 1;
+                    
+                    if (codeCol.includes('/')) codeCol = codeCol.split('/')[0];
+                    code = codeCol.trim().toUpperCase();
+                    
+                    // Если перед MF стоит код страны - отрезаем
+                    if (/^[A-Z]{2}MF/.test(code)) {
+                        code = code.substring(2);
+                    }
+
+                    // Ищем количество паллет (колонка перед словом paleta)
+                    let paletaIdx = cols.findIndex(c => c.toLowerCase().includes('paleta'));
+                    if (paletaIdx > 0) {
+                        totalPlaces = parseInt(cols[paletaIdx - 1], 10) || 1;
+                    } else {
+                        // Если слова paleta нет, берем первую числовую колонку после кода
+                        let numCol = cols.find((c, idx) => idx > 0 && c.length > 0 && !isNaN(parseInt(c, 10)));
+                        if (numCol) totalPlaces = parseInt(numCol, 10) || 1;
+                    }
+
+                    // Ищем вес и штуки
+                    if (paletaIdx >= 0 && paletaIdx + 4 < cols.length) {
+                        brutto = cols[paletaIdx + 1] || "-";
+                        netto = cols[paletaIdx + 2] || "-";
+                        pcs = cols[paletaIdx + 4] || "-";
+                    } else if (cols.length >= 6) {
+                        brutto = cols[cols.length - 4] || "-";
+                        netto = cols[cols.length - 3] || "-";
+                        pcs = cols[cols.length - 1] || "-";
                     }
                 } else {
-                    // Копирование сплошным ТЕКСТОМ (без пробелов)
+                    // Обработка сплошного текста (без табов)
                     const paletaMatch = line.match(/(.*?)(\d+)\s*paleta(.*)/i);
                     if (paletaMatch) {
-                        let rawPre = paletaMatch[1];
+                        let pre = paletaMatch[1].trim();
                         totalPlaces = parseInt(paletaMatch[2], 10) || 1;
-                        
-                        // Удаляем всё после слэша, если он есть
-                        if (rawPre.includes('/')) {
-                            rawPre = rawPre.split('/')[0];
-                        }
-                        rawPre = rawPre.trim();
-                        
-                        // Если вначале стоит 2 буквы страны (PL, DE, CZ, GB...) - отрезаем их
-                        if (/^[A-Za-z]{2}/.test(rawPre)) {
-                            rawPre = rawPre.substring(2);
-                        }
-                        code = rawPre.toUpperCase();
+                        if (pre.includes('/')) pre = pre.split('/')[0];
+                        const words = pre.split(/\s+/);
+                        code = words.reduce((long, cur) => cur.length > long.length ? cur : long, "").toUpperCase();
+                        if (/^[A-Z]{2}MF/.test(code)) code = code.substring(2);
                     } else {
-                        // Экстренный случай: просто ищем текст до слэша
-                        const slashMatch = line.match(/(.*?)\//);
-                        if (slashMatch) {
-                            let rawPre = slashMatch[1].trim();
-                            if (/^[A-Za-z]{2}/.test(rawPre)) {
-                                rawPre = rawPre.substring(2);
-                            }
-                            code = rawPre.toUpperCase();
-                        } else {
-                            code = line.toUpperCase();
-                        }
+                        let pre = line;
+                        if (pre.includes('/')) pre = pre.split('/')[0];
+                        const words = pre.split(/\s+/);
+                        code = words.reduce((long, cur) => cur.length > long.length ? cur : long, "").toUpperCase();
+                        if (/^[A-Z]{2}MF/.test(code)) code = code.substring(2);
                     }
                 }
 
+                // Защита: пропускаем мусорные строки (длина кода < 4 символов)
                 if (!code || code.length < 4) return;
-
-                if (seen.has(code)) return; 
+                
+                if (seen.has(code)) return;
                 seen.add(code);
 
                 items.push({
