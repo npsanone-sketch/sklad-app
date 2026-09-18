@@ -13,7 +13,6 @@
         @keyframes flashGreen { 0% { background-color: #22c55e; } 100% { background-color: transparent; } }
         @keyframes flashRed { 0% { background-color: #ef4444; } 100% { background-color: transparent; } }
         .flash-green { animation: flashGreen 1s ease-out; }
-        /* Увеличили длительность красной анимации до 2 секунд */
         .flash-red { animation: flashRed 2s ease-out; }
         
         #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(239, 68, 68, 0.95); z-index: 50; justify-content: center; align-items: center; flex-direction: column; color: white; }
@@ -164,7 +163,7 @@
         let unsubscribeCurrentScan = null;
         let currentManifestDoc = null; 
         
-        // --- ЗВУК ---
+        // --- НОВЫЕ ПРОФЕССИОНАЛЬНЫЕ ЗВУКИ ---
         let audioCtx = null;
         
         function unlockAudio() {
@@ -199,14 +198,18 @@
         }
 
         function playSuccessSound() {
-            playTone(880, 'sine', 0.2, 0.5); 
-            setTimeout(() => playTone(1108, 'sine', 1.0, 0.5), 100);
+            // Классический "Пик" терминала Zebra (высокий, короткий и звонкий)
+            playTone(2000, 'square', 0.1, 0.2); 
         }
 
         function playErrorSound() {
-            // УВЕЛИЧЕНО ДО 2 СЕКУНД
-            playTone(150, 'sawtooth', 2.0, 1); 
-            playTone(155, 'sawtooth', 2.0, 1);
+            // Пульсирующая тревожная сирена на 2 секунды (5 гудков подряд)
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    playTone(250, 'square', 0.3, 0.5);
+                    playTone(255, 'sawtooth', 0.3, 0.5); // Диссонанс для неприятного звука
+                }, i * 400); // Интервал 0.4с * 5 раз = 2 секунды
+            }
         }
 
         // --- УМНЫЙ ПАРСЕР С ПАЛЛЕТАМИ ---
@@ -219,7 +222,6 @@
                 line = line.trim();
                 if(!line) return;
 
-                // Ищем номер манифеста
                 const match = line.match(/(MF[A-Z0-9]+)\//i);
                 if (!match) return; 
 
@@ -229,7 +231,6 @@
 
                 let brutto = "-", netto = "-", pcs = "-", totalPlaces = 1;
 
-                // 1. Попытка распарсить по TAB (если скопировано из Excel)
                 if (line.includes('\t')) {
                     const cols = line.split('\t');
                     if (cols.length >= 8) {
@@ -239,8 +240,6 @@
                         pcs = cols[7].trim() || "-";
                     }
                 } else {
-                    // 2. Резервный поиск, если вставили как сплошной текст без табов
-                    // Ищем цифру перед словом paleta (например "2paleta")
                     const placesMatch = line.match(/(\d+)\s*paleta/i);
                     if (placesMatch) {
                         totalPlaces = parseInt(placesMatch[1], 10) || 1;
@@ -354,7 +353,6 @@
                     snapshot.forEach(doc => {
                         const data = doc.data();
                         
-                        // Считаем общее количество мест (паллет)
                         let totalPlaces = 0;
                         let scannedPlaces = 0;
                         
@@ -420,7 +418,6 @@
                         totalPlaces += iTotal;
                         scannedPlaces += iScanned;
                         
-                        // Логика отображения в списке
                         let liClass, icon;
                         if (iScanned === iTotal) {
                             liClass = 'bg-green-100 text-green-800 opacity-70';
@@ -491,16 +488,15 @@
                     const iTotal = items[i].totalPlaces || 1;
                     const iScanned = items[i].scannedPlaces !== undefined ? items[i].scannedPlaces : (items[i].status === 'scanned' ? iTotal : 0);
 
-                    // Если еще не полностью загружено
                     if (iScanned < iTotal) {
                         items[i].scannedPlaces = iScanned + 1;
                         items[i].scannedBy = currentUser.email;
                         items[i].scannedAt = new Date().toISOString();
                         
                         if (items[i].scannedPlaces === iTotal) {
-                            items[i].status = 'scanned'; // Завершили все паллеты этого манифеста
+                            items[i].status = 'scanned'; 
                         } else {
-                            items[i].status = 'partial'; // Отсканировали только часть
+                            items[i].status = 'partial';
                         }
                         
                         foundItem = items[i];
