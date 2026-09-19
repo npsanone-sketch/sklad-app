@@ -22,10 +22,10 @@
         @media print {
             body > *:not(#print-area) { display: none !important; }
             #print-area { display: block !important; position: static; width: 100%; color: black; padding: 20px; }
-            .print-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+            .print-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
             .print-table th, .print-table td { border: 1px solid #000; padding: 6px; text-align: left; }
             .print-table th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; }
-            .signature-block { margin-top: 50px; display: flex; justify-content: space-between; }
+            .signature-block { margin-top: 40px; display: flex; justify-content: space-between; }
         }
     </style>
 </head>
@@ -271,7 +271,6 @@
                 }
 
                 if (!code || code.length < 4) return;
-                
                 if (seen.has(code)) return;
                 seen.add(code);
 
@@ -384,13 +383,32 @@
                         
                         let totalPlaces = 0;
                         let scannedPlaces = 0;
-                        
+                        let lastScanDt = null;
+
                         data.items.forEach(i => {
                             totalPlaces += (i.totalPlaces || 1);
                             scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
+                            
+                            // Находим время самого последнего скана
+                            if (i.scannedAt) {
+                                let dt = new Date(i.scannedAt);
+                                if (!lastScanDt || dt > lastScanDt) lastScanDt = dt;
+                            }
                         });
 
                         const isCompleted = totalPlaces > 0 && scannedPlaces === totalPlaces;
+
+                        // Расчет времени загрузки (если загружено)
+                        let durationHtml = '';
+                        if (isCompleted && data.createdAt && lastScanDt) {
+                            let createdDt = typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(data.createdAt);
+                            let diffSecs = Math.floor((lastScanDt - createdDt) / 1000);
+                            if (diffSecs >= 0) {
+                                let h = Math.floor(diffSecs / 3600);
+                                let m = Math.floor((diffSecs % 3600) / 60);
+                                durationHtml = `<div class="text-xs text-blue-700 mt-1 font-bold">⏱ Загружено за: ${h > 0 ? h + ' ч ' : ''}${m} мин</div>`;
+                            }
+                        }
 
                         const color = isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400';
                         const textColor = isCompleted ? 'text-green-700' : 'text-blue-800';
@@ -408,6 +426,7 @@
                                     <div class="${barColor} h-2.5 rounded-full" style="width: ${percent}%"></div>
                                 </div>
                                 <div class="text-xs text-gray-500 mt-2">Создал: ${data.creatorEmail}</div>
+                                ${durationHtml}
                             </div>
                         `;
                     });
@@ -458,7 +477,6 @@
                             icon = '⏳';
                         }
                         
-                        // Если отсканировано - добавляем время сканирования в список визуально
                         let timeHtml = '';
                         if (item.scannedAt) {
                             const dt = new Date(item.scannedAt);
@@ -590,26 +608,67 @@
             document.getElementById('scanner-input').focus(); 
         }
 
-        // --- ПЕЧАТЬ PDF С ТОЧНЫМ ВРЕМЕНЕМ ДО СЕКУНД ---
+        // --- ПЕЧАТЬ PDF С РАСЧЕТОМ ВРЕМЕНИ ЗАГРУЗКИ ---
         function generatePDF() {
             if (!currentManifestDoc) return;
             const data = currentManifestDoc;
             
             let totalPlaces = 0;
             let scannedPlaces = 0;
+            let lastScanDt = null;
+
             data.items.forEach(i => {
                 totalPlaces += (i.totalPlaces || 1);
                 scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
+                
+                if (i.scannedAt) {
+                    let dt = new Date(i.scannedAt);
+                    if (!lastScanDt || dt > lastScanDt) lastScanDt = dt;
+                }
             });
             
-            const dateStr = new Date().toLocaleString('ru-RU');
+            const printDateStr = new Date().toLocaleString('ru-RU');
+            
+            // Расчет времени
+            let createdDt = null;
+            if (data.createdAt) {
+                createdDt = typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(data.createdAt);
+            }
+            let createdStr = createdDt ? createdDt.toLocaleString('ru-RU') : '-';
+            let lastScanStr = lastScanDt ? lastScanDt.toLocaleString('ru-RU') : 'Нет сканирований';
+            
+            let durationStr = "-";
+            if (createdDt && lastScanDt) {
+                let diffSecs = Math.floor((lastScanDt - createdDt) / 1000);
+                if (diffSecs >= 0) {
+                    let h = Math.floor(diffSecs / 3600);
+                    let m = Math.floor((diffSecs % 3600) / 60);
+                    let s = diffSecs % 60;
+                    let parts = [];
+                    if (h > 0) parts.push(h + ' ч');
+                    if (m > 0 || h > 0) parts.push(m + ' мин');
+                    parts.push(s + ' сек');
+                    durationStr = parts.join(' ');
+                }
+            }
 
             let html = `
-                <h1 style="text-align: center; font-size: 24px; font-family: sans-serif;">АКТ ЗАГРУЗКИ</h1>
-                <p><strong>Автомобиль:</strong> ${data.carNumber}</p>
-                <p><strong>Дата создания:</strong> ${dateStr}</p>
-                <p><strong>Создал:</strong> ${data.creatorEmail}</p>
-                <p><strong>Итог:</strong> Всего мест: ${totalPlaces} / Загружено мест: ${scannedPlaces}</p>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="font-size: 24px; font-family: sans-serif; margin-bottom: 5px;">АКТ ЗАГРУЗКИ Т/С</h1>
+                    <p style="font-size: 18px; font-weight: bold; margin: 0;">Автомобиль: ${data.carNumber}</p>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; font-family: sans-serif; font-size: 14px; margin-bottom: 20px; background: #f3f4f6; padding: 10px; border-radius: 5px;">
+                    <div>
+                        <p style="margin: 3px 0;"><strong>Создана (Офис):</strong> ${createdStr}</p>
+                        <p style="margin: 3px 0;"><strong>Автор:</strong> ${data.creatorEmail}</p>
+                        <p style="margin: 3px 0;"><strong>Последний скан:</strong> ${lastScanStr}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin: 3px 0; font-size: 16px;"><strong>Время загрузки: <span style="color: #1d4ed8;">${durationStr}</span></strong></p>
+                        <p style="margin: 3px 0; font-size: 16px;"><strong>Итог:</strong> Загружено ${scannedPlaces} из ${totalPlaces} мест</p>
+                    </div>
+                </div>
                 
                 <table class="print-table">
                     <thead><tr><th>№</th><th>Код</th><th>Места</th><th>Brutto</th><th>Netto</th><th>PCS</th><th>Статус</th><th>Время скана</th></tr></thead>
@@ -624,7 +683,6 @@
                 let timeTxt = "-";
                 if (item.scannedAt) {
                     const dt = new Date(item.scannedAt);
-                    // Форматируем до секунд: ДД.ММ.ГГГГ ЧЧ:ММ:СС
                     timeTxt = dt.toLocaleDateString('ru-RU') + " " + dt.toLocaleTimeString('ru-RU', { hour12: false });
                 }
 
@@ -642,10 +700,9 @@
 
             html += `</tbody></table>`;
 
-            // ДОБАВЛЕН БЛОК ОШИБОК С УКАЗАНИЕМ ВРЕМЕНИ
             if (data.errors && data.errors.length > 0) {
                 html += `
-                    <h3 style="margin-top:30px; color: red; font-family: sans-serif;">Ошибочные сканирования:</h3>
+                    <h3 style="margin-top:30px; color: red; font-family: sans-serif;">Ошибочные сканирования (лишние или повторные номера):</h3>
                     <table class="print-table">
                         <thead><tr><th>№</th><th>Отсканированный код</th><th>Тип ошибки</th><th>Сотрудник</th><th>Время скана</th></tr></thead>
                         <tbody>
