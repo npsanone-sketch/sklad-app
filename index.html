@@ -65,11 +65,11 @@
         <div class="flex items-center gap-3">
             <!-- КНОПКА ОНЛАЙН СТАТУСА -->
             <div class="relative">
-                <button onclick="togglePresenceModal()" class="text-xs md:text-sm bg-blue-900 hover:bg-blue-700 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-600 transition">
+                <button onclick="togglePresenceModal()" class="text-xs md:text-sm bg-blue-900 hover:bg-blue-700 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-600 transition shadow">
                     <span class="animate-pulse">🟢</span> В сети: <span id="online-count-badge" class="font-bold">0</span>
                 </button>
                 <!-- Выпадающий список -->
-                <div id="presence-modal" class="hidden absolute top-10 right-0 bg-white shadow-2xl border rounded-lg w-64 text-gray-800 p-3">
+                <div id="presence-modal" class="hidden absolute top-10 right-0 bg-white shadow-2xl border rounded-lg w-64 text-gray-800 p-3 z-50">
                     <h4 class="font-bold border-b pb-2 mb-2 text-sm flex justify-between">
                         Активные сейчас
                         <button onclick="togglePresenceModal()" class="text-gray-400 hover:text-red-500">✖</button>
@@ -172,7 +172,7 @@
                 <!-- ПЛАВАЮЩАЯ КНОПКА ЧАТА ДЛЯ СКЛАДА -->
                 <button onclick="openChatPanel()" class="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full h-14 w-14 flex items-center justify-center shadow-xl z-20 text-2xl transition transform hover:scale-110">
                     💬
-                    <span id="scan-chat-badge" class="hidden absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 border-2 border-white flex items-center justify-center">!</span>
+                    <span id="scan-chat-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 border-2 border-white flex items-center justify-center">!</span>
                 </button>
             </div>
         </div>
@@ -182,7 +182,7 @@
     <div id="chat-panel" class="fixed right-0 top-0 h-full w-full md:w-96 bg-gray-50 shadow-2xl transform translate-x-full transition-transform z-50 flex flex-col border-l border-gray-300">
         <div class="bg-blue-800 text-white p-4 flex justify-between items-center shrink-0 shadow">
             <h3 class="font-bold flex items-center gap-2">💬 Чат: <span id="chat-title-car"></span></h3>
-            <button onclick="closeChatPanel()" class="text-white hover:text-gray-300 text-2xl font-bold">&times;</button>
+            <button onclick="closeChatPanel()" class="text-white hover:text-gray-300 text-3xl font-bold leading-none">&times;</button>
         </div>
         <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white"></div>
         
@@ -191,7 +191,7 @@
             <button onclick="sendChatMessage('📦 Груз поврежден')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">📦 Груз поврежден</button>
             <button onclick="sendChatMessage('🛑 Нет места в авто')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">🛑 Нет места в авто</button>
             <button onclick="sendChatMessage('❓ Штрих-код не читается')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">❓ Штрих-код не читается</button>
-            <button onclick="sendChatMessage('✅ Загрузка завершена')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">✅ Загрузка завершена</button>
+            <button onclick="sendChatMessage('✅ Обработка завершена')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">✅ Работа завершена</button>
         </div>
 
         <div class="p-3 border-t bg-gray-100 flex gap-2 shrink-0">
@@ -211,7 +211,6 @@
     <script>
         // =========================================================================
         // НАСТРОЙКА ДОСТУПА (РОЛИ)
-        // Впишите сюда email-адреса ОФИСНЫХ сотрудников.
         // =========================================================================
         const ADMIN_EMAILS = [
             'skypochka.v@novapost.pl',
@@ -225,7 +224,7 @@
         
         let isAdmin = false;
         let currentDate = new Date();
-        window.currentActivity = "Смотрит Главный экран"; // Текущая активность
+        window.currentActivity = "Смотрит Главный экран";
 
         const firebaseConfig = {
           apiKey: "AIzaSyBUp11R-Sq46IrW9lwH5uFjXXzli5OASsU",
@@ -298,7 +297,6 @@
         }
 
         function playChatPing() {
-            // Мягкий "бульк" для чата, чтобы не раздражало
             playTone(600, 'sine', 0.1, 0.4);
             setTimeout(() => playTone(800, 'sine', 0.15, 0.4), 150);
         }
@@ -321,7 +319,7 @@
         function startPresenceTracker() {
             updatePresence();
             if(presenceInterval) clearInterval(presenceInterval);
-            presenceInterval = setInterval(updatePresence, 60000); // Раз в минуту
+            presenceInterval = setInterval(updatePresence, 60000); 
 
             db.collection('presence').onSnapshot(snap => {
                 let onlineCount = 0;
@@ -330,8 +328,11 @@
                 snap.forEach(doc => {
                     const d = doc.data();
                     if(!d.lastActive) return;
-                    const diff = (now - d.lastActive.toDate()) / 1000;
-                    if(diff < 150) { // Если активность была менее 2.5 минут назад
+                    
+                    let diff = (now - d.lastActive.toDate()) / 1000;
+                    if (diff < 0) diff = 0; // Защита от кривого времени на телефоне клиента
+                    
+                    if(diff < 300) { // Активность за последние 5 минут
                         onlineCount++;
                         const roleColor = d.role === 'Офис' ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-800';
                         html += `
@@ -387,6 +388,7 @@
             loadDashboard();
         }
 
+        // --- АВТОРИЗАЦИЯ И РОЛИ ---
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
@@ -396,15 +398,15 @@
                 document.getElementById('dashboard-screen').classList.remove('hidden');
                 document.getElementById('date-ribbon').classList.remove('hidden');
                 
-                let roleLabel = isAdmin ? 'ОФИС (Админ)' : 'СКЛАД';
-                document.getElementById('user-info').innerHTML = `${user.email} <span class="bg-blue-900 text-white px-2 py-0.5 rounded ml-2 text-xs font-bold">${roleLabel}</span>`;
+                let roleLabel = isAdmin ? 'ОФИС' : 'СКЛАД';
+                document.getElementById('user-info').innerHTML = `${user.email} <span class="bg-blue-900 text-white px-2 py-0.5 rounded ml-2 text-xs font-bold shadow-sm">${roleLabel}</span>`;
                 
                 if (isAdmin) {
                     document.getElementById('create-btn').classList.remove('hidden');
-                    document.getElementById('chat-quick-replies').classList.add('hidden');
+                    document.getElementById('chat-quick-replies').classList.add('hidden'); // Офису не нужны быстрые кнопки
                 } else {
                     document.getElementById('create-btn').classList.add('hidden');
-                    document.getElementById('chat-quick-replies').classList.remove('hidden');
+                    document.getElementById('chat-quick-replies').classList.remove('hidden'); // Складу нужны
                 }
 
                 startPresenceTracker();
@@ -510,6 +512,7 @@
                     pcs: pcs
                 });
             });
+
             return items;
         }
 
@@ -527,6 +530,7 @@
             }
         }
 
+        // --- СОЗДАНИЕ И РЕДАКТИРОВАНИЕ ---
         function showCreateForm() {
             editingManifestId = null;
             document.getElementById('modal-title').innerText = 'Новая ведомость';
@@ -669,7 +673,7 @@
             }
         }
 
-        // --- ДАШБОРД ---
+        // --- ДАШБОРД (ГЛАВНЫЙ ЭКРАН) ---
         function loadDashboard() {
             window.currentActivity = "Смотрит Главный экран";
             updatePresence();
@@ -765,25 +769,25 @@
 
                         const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
                         
-                        // Кнопки управления (Офис)
-                        let adminButtons = '';
+                        // Индикатор Чата (Кнопка чата доступна всем прямо на карточке)
+                        const hasUnread = isAdmin ? data.unreadByOffice : data.unreadByWarehouse;
+                        const chatBadge = hasUnread ? `<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>` : '';
+
+                        let actionButtons = `
+                            <div class="absolute top-2 right-2 flex gap-1 z-10">
+                                <button onclick="openChatPanel(event, '${doc.id}', '${data.carNumber}')" class="relative text-blue-600 bg-blue-50 hover:bg-blue-100 rounded p-1 shadow-sm border border-blue-200 transition ${hasUnread ? 'animate-bounce' : ''}" title="Чат">💬${chatBadge}</button>
+                        `;
                         if (isAdmin) {
-                            adminButtons = `
+                            actionButtons += `
                                 <button onclick="editManifest(event, '${doc.id}')" class="text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Редактировать">✏️</button>
                                 <button onclick="deleteManifest(event, '${doc.id}')" class="text-gray-600 hover:text-red-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Удалить">✖</button>
                             `;
                         }
-                        
-                        // Индикатор Чата
-                        const hasUnread = isAdmin ? data.unreadByOffice : data.unreadByWarehouse;
-                        const chatBadge = hasUnread ? `<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>` : '';
+                        actionButtons += `</div>`;
 
                         grid.innerHTML += `
                             <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${cardClass} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
-                                <div class="absolute top-2 right-2 flex gap-1 z-10">
-                                    <button onclick="openChatPanel(event, '${doc.id}', '${data.carNumber}')" class="relative text-blue-600 bg-blue-50 hover:bg-blue-100 rounded p-1 shadow-sm border border-blue-200 transition mr-1" title="Чат">💬${chatBadge}</button>
-                                    ${adminButtons}
-                                </div>
+                                ${actionButtons}
                                 <div class="mb-3 pr-24">
                                     ${typeBadge}
                                 </div>
@@ -841,12 +845,14 @@
                         actionWord.innerText = 'выгружено';
                     }
 
-                    // Чат бейдж
+                    // Чат бейдж для плавающей кнопки (только внутри сканера)
                     const hasUnread = isAdmin ? data.unreadByOffice : data.unreadByWarehouse;
                     const chatBadge = document.getElementById('scan-chat-badge');
                     if (hasUnread) {
                         chatBadge.classList.remove('hidden');
-                        if (!isAdmin) playChatPing(); // Звук только для склада, чтобы обратить внимание
+                        if (!isAdmin && document.getElementById('chat-panel').classList.contains('translate-x-full')) {
+                            playChatPing(); // Звук для склада, если панель чата закрыта
+                        }
                     } else {
                         chatBadge.classList.add('hidden');
                     }
@@ -1063,42 +1069,48 @@
         }
 
         // --- ВНУТРЕННИЙ ЧАТ ---
-        function openChatPanel(e, manifestId = currentScanId, carNum = currentManifestDoc?.carNumber) {
+        function openChatPanel(e, manifestId = null, carNum = null) {
             if(e) e.stopPropagation();
-            activeChatManifestId = manifestId;
+            
+            // Если открываем со страницы дашборда
+            if (manifestId) activeChatManifestId = manifestId;
+            else activeChatManifestId = currentScanId; // Если из сканера
+            
+            if (!carNum && currentManifestDoc) carNum = currentManifestDoc.carNumber;
+            
             document.getElementById('chat-title-car').innerText = carNum || '';
             document.getElementById('chat-panel').classList.remove('translate-x-full');
             
-            // Сбрасываем счетчик непрочитанных для себя
             const updateField = isAdmin ? { unreadByOffice: false } : { unreadByWarehouse: false };
-            db.collection('manifests').doc(manifestId).update(updateField);
+            db.collection('manifests').doc(activeChatManifestId).update(updateField);
 
             if(unsubscribeChat) unsubscribeChat();
-            unsubscribeChat = db.collection('manifests').doc(manifestId).onSnapshot(doc => {
+            unsubscribeChat = db.collection('manifests').doc(activeChatManifestId).onSnapshot(doc => {
                 if(!doc.exists) return;
                 const data = doc.data();
                 const msgs = data.messages || [];
                 const container = document.getElementById('chat-messages');
                 
-                container.innerHTML = msgs.map(m => {
-                    const isMe = m.sender === currentUser.email;
-                    const align = isMe ? 'text-right' : 'text-left';
-                    const bg = isMe ? 'bg-blue-100 text-blue-900' : 'bg-gray-200 text-gray-800';
-                    const date = new Date(m.timestamp).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
-                    const name = m.sender.split('@')[0];
-                    return `
-                        <div class="${align} mb-3">
-                            <div class="text-[10px] text-gray-500 mb-0.5 font-bold">${m.senderRole} (${name}) • ${date}</div>
-                            <div class="inline-block p-2 rounded-lg ${bg} text-sm shadow-sm text-left max-w-[85%]">${m.text}</div>
-                        </div>`;
-                }).join('');
+                if (msgs.length === 0) {
+                    container.innerHTML = `<div class="text-center text-gray-400 mt-10 text-sm">Нет сообщений. Напишите первым!</div>`;
+                } else {
+                    container.innerHTML = msgs.map(m => {
+                        const isMe = m.sender === currentUser.email;
+                        const align = isMe ? 'text-right' : 'text-left';
+                        const bg = isMe ? 'bg-blue-100 text-blue-900 border border-blue-200' : 'bg-gray-100 text-gray-800 border border-gray-200';
+                        const date = new Date(m.timestamp).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+                        const name = m.sender.split('@')[0];
+                        return `
+                            <div class="${align} mb-3">
+                                <div class="text-[10px] text-gray-500 mb-0.5 font-bold">${m.senderRole} (${name}) • ${date}</div>
+                                <div class="inline-block p-2 rounded-lg ${bg} text-sm shadow-sm text-left max-w-[85%]">${m.text}</div>
+                            </div>`;
+                    }).join('');
+                    container.scrollTop = container.scrollHeight;
+                }
                 
-                // Прокрутка вниз
-                container.scrollTop = container.scrollHeight;
-                
-                // Если мы в чате и сообщение пришло, помечаем как прочитанное (чтобы бейдж не загорался)
-                if (isAdmin && data.unreadByOffice) db.collection('manifests').doc(manifestId).update({unreadByOffice: false});
-                if (!isAdmin && data.unreadByWarehouse) db.collection('manifests').doc(manifestId).update({unreadByWarehouse: false});
+                if (isAdmin && data.unreadByOffice) db.collection('manifests').doc(activeChatManifestId).update({unreadByOffice: false});
+                if (!isAdmin && data.unreadByWarehouse) db.collection('manifests').doc(activeChatManifestId).update({unreadByWarehouse: false});
             });
         }
 
@@ -1121,7 +1133,7 @@
             const text = quickText || input.value.trim();
             if (!text || !activeChatManifestId) return;
             
-            input.value = ''; // очищаем сразу для отзывчивости
+            input.value = ''; 
 
             await db.collection('manifests').doc(activeChatManifestId).update({
                 messages: firebase.firestore.FieldValue.arrayUnion({
@@ -1130,8 +1142,8 @@
                     senderRole: isAdmin ? 'Офис' : 'Склад',
                     timestamp: new Date().toISOString()
                 }),
-                unreadByOffice: !isAdmin,     // Если пишет склад - непрочитано для офиса
-                unreadByWarehouse: isAdmin    // Если пишет офис - непрочитано для склада
+                unreadByOffice: !isAdmin,     
+                unreadByWarehouse: isAdmin    
             });
         }
 
