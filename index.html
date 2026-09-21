@@ -14,7 +14,6 @@
         @keyframes flashRed { 0% { background-color: #ef4444; } 100% { background-color: transparent; } }
         @keyframes flashOrange { 0% { background-color: #f97316; } 100% { background-color: transparent; } }
         
-        /* Анимация тревожного мигания карточки */
         @keyframes urgentBlink {
             0%, 100% { box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.8); border-color: #ef4444; background-color: #fef2f2; transform: scale(1.02); }
             50% { box-shadow: none; border-color: #d1d5db; background-color: #ffffff; transform: scale(1); }
@@ -130,9 +129,7 @@
             </div>
         </div>
 
-        <!-- ТРЕВОЖНАЯ ПАНЕЛЬ ДЛЯ СКАНЕРА -->
         <div id="scan-alert-bar" class="hidden bg-red-600 text-white p-3 text-center font-bold text-sm md:text-base animate-pulse shrink-0 shadow-md z-10 border-b-4 border-red-800">
-            <!-- Сюда вставится текст тревоги -->
         </div>
 
         <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
@@ -402,39 +399,70 @@
                 if (editingManifestId) {
                     const docRef = db.collection('manifests').doc(editingManifestId);
                     const docSnap = await docRef.get();
-                    const oldItems = docSnap.data().items;
+                    const data = docSnap.data();
+                    const oldItems = data.items;
                     let mergedItems = [];
+                    
+                    let addedLog = [];
+                    let removedLog = [];
+                    let changedLog = [];
 
+                    // Проверяем старые манифесты
                     oldItems.forEach(oldItem => {
                         const foundInNew = newItemsParsed.find(n => n.code === oldItem.code);
                         if (foundInNew) {
+                            if (oldItem.totalPlaces !== foundInNew.totalPlaces) {
+                                changedLog.push(`${oldItem.code} (${oldItem.totalPlaces} шт ➡️ ${foundInNew.totalPlaces} шт)`);
+                            }
                             oldItem.totalPlaces = foundInNew.totalPlaces;
                             oldItem.brutto = foundInNew.brutto;
                             oldItem.netto = foundInNew.netto;
                             oldItem.pcs = foundInNew.pcs;
                             oldItem.isCancelled = false;
+                            
                             if (oldItem.status === 'removed') {
                                 oldItem.status = oldItem.scannedPlaces >= oldItem.totalPlaces ? 'scanned' : (oldItem.scannedPlaces > 0 ? 'partial' : 'pending');
                             }
                             mergedItems.push(oldItem);
                         } else {
+                            // Удалили из списка
+                            removedLog.push(oldItem.code);
                             if (oldItem.scannedPlaces > 0 && oldItem.status !== 'removed') {
                                 oldItem.isCancelled = true;
                                 mergedItems.push(oldItem);
                             } 
+                            // Если не сканировался - просто исчезает из mergedItems
                         }
                     });
 
+                    // Проверяем новые манифесты
                     newItemsParsed.forEach(newItem => {
                         const foundInOld = oldItems.find(o => o.code === newItem.code);
                         if (!foundInOld) {
+                            addedLog.push(newItem.code);
                             mergedItems.push(newItem);
                         }
                     });
 
+                    const editHistory = data.editHistory || [];
+                    let isModifiedFlag = data.modified || false;
+
+                    if (addedLog.length > 0 || removedLog.length > 0 || changedLog.length > 0) {
+                        editHistory.push({
+                            editedAt: new Date().toISOString(),
+                            editedBy: currentUser.email,
+                            added: addedLog,
+                            removed: removedLog,
+                            changed: changedLog
+                        });
+                        isModifiedFlag = true;
+                    }
+
                     await docRef.update({ 
                         carNumber: car,
-                        items: mergedItems 
+                        items: mergedItems,
+                        editHistory: editHistory,
+                        modified: isModifiedFlag
                     });
                 } else {
                     await db.collection('manifests').add({
@@ -444,6 +472,8 @@
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         items: newItemsParsed,
                         errors: [],
+                        editHistory: [],
+                        modified: false,
                         status: 'pending'
                     });
                 }
@@ -514,9 +544,19 @@
                             ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold shadow-sm">ЗАГРУЗКА</span>'
                             : '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold shadow-sm">ВЫГРУЗКА</span>';
 
+                        // Индикатор простого изменения
+                        if (data.modified && !isCompleted && !needsReturn) {
+                            typeBadge += ' <span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded font-bold ml-1 shadow-sm">⚠️ ИЗМЕНЕНА</span>';
+                        }
+
                         let cardClass = isLoad 
                             ? (isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400')
                             : (isCompleted ? 'bg-orange-100 border-orange-500' : 'bg-white border-purple-400');
+                        
+                        // Если изменена и еще не завершена (без экстренного возврата) - делаем желтоватой
+                        if (data.modified && !isCompleted && !needsReturn) {
+                            cardClass = 'bg-yellow-50 border-yellow-400';
+                        }
                         
                         let textColor = isLoad 
                             ? (isCompleted ? 'text-green-700' : 'text-blue-800')
@@ -662,7 +702,6 @@
                     document.getElementById('scan-count').innerText = scannedPlaces;
                     document.getElementById('scan-total').innerText = totalPlaces;
 
-                    // ПОКАЗЫВАЕМ ПАНЕЛЬ ТРЕВОГИ НАД СКАНЕРОМ
                     const alertBar = document.getElementById('scan-alert-bar');
                     if (returns.length > 0) {
                         alertBar.innerHTML = `⚠️ ВНИМАНИЕ, ИЗМЕНЕНИЯ! НУЖНО ВЕРНУТЬ:<br><span class="font-mono text-sm">${returns.join(', ')}</span>`;
@@ -909,10 +948,38 @@
 
             html += `</tbody></table>`;
 
+            // ИСТОРИЯ РЕДАКТИРОВАНИЙ (ЛОГИ)
+            if (data.editHistory && data.editHistory.length > 0) {
+                html += `
+                    <h3 style="margin-top:30px; font-family: sans-serif; font-size: 16px;">История изменений ведомости:</h3>
+                    <table class="print-table" style="margin-top: 10px;">
+                        <thead><tr><th>№</th><th>Дата и Время</th><th>Сотрудник (Офис)</th><th>Добавлены</th><th>Удалены</th><th>Изменено кол-во мест</th></tr></thead>
+                        <tbody>
+                `;
+                data.editHistory.forEach((log, index) => {
+                    let logTime = new Date(log.editedAt);
+                    let formattedLogTime = logTime.toLocaleDateString('ru-RU') + " " + logTime.toLocaleTimeString('ru-RU', { hour12: false });
+                    
+                    let addedText = log.added && log.added.length > 0 ? log.added.join(', ') : '-';
+                    let removedText = log.removed && log.removed.length > 0 ? log.removed.join(', ') : '-';
+                    let changedText = log.changed && log.changed.length > 0 ? log.changed.join(', ') : '-';
+
+                    html += `<tr>
+                        <td>${index + 1}</td>
+                        <td>${formattedLogTime}</td>
+                        <td>${log.editedBy}</td>
+                        <td style="color: green;">${addedText}</td>
+                        <td style="color: red;">${removedText}</td>
+                        <td style="color: blue;">${changedText}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+            }
+
             if (data.errors && data.errors.length > 0) {
                 html += `
-                    <h3 style="margin-top:30px; color: red; font-family: sans-serif;">Ошибочные сканирования (лишние или повторные номера):</h3>
-                    <table class="print-table">
+                    <h3 style="margin-top:30px; color: red; font-family: sans-serif; font-size: 16px;">Ошибочные сканирования (лишние номера):</h3>
+                    <table class="print-table" style="margin-top: 10px;">
                         <thead><tr><th>№</th><th>Отсканированный код</th><th>Тип ошибки</th><th>Сотрудник</th><th>Время скана</th></tr></thead>
                         <tbody>
                 `;
