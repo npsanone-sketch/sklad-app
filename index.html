@@ -37,7 +37,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col">
+<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col relative">
 
     <!-- Экран входа -->
     <div id="login-screen" class="absolute inset-0 z-50 bg-gray-100 flex items-center justify-center">
@@ -57,12 +57,28 @@
     </div>
 
     <!-- Верхняя панель -->
-    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center no-print shrink-0">
+    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center no-print shrink-0 z-20">
         <div>
             <h1 class="text-xl font-bold">Склад Контроль</h1>
             <p id="user-info" class="text-sm text-blue-200"></p>
         </div>
-        <button onclick="logout()" class="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded">Выйти</button>
+        <div class="flex items-center gap-3">
+            <!-- КНОПКА ОНЛАЙН СТАТУСА -->
+            <div class="relative">
+                <button onclick="togglePresenceModal()" class="text-xs md:text-sm bg-blue-900 hover:bg-blue-700 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-600 transition">
+                    <span class="animate-pulse">🟢</span> В сети: <span id="online-count-badge" class="font-bold">0</span>
+                </button>
+                <!-- Выпадающий список -->
+                <div id="presence-modal" class="hidden absolute top-10 right-0 bg-white shadow-2xl border rounded-lg w-64 text-gray-800 p-3">
+                    <h4 class="font-bold border-b pb-2 mb-2 text-sm flex justify-between">
+                        Активные сейчас
+                        <button onclick="togglePresenceModal()" class="text-gray-400 hover:text-red-500">✖</button>
+                    </h4>
+                    <div id="presence-list" class="max-h-60 overflow-y-auto space-y-2"></div>
+                </div>
+            </div>
+            <button onclick="logout()" class="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded">Выйти</button>
+        </div>
     </header>
 
     <!-- ПАНЕЛЬ АРХИВА ДАТ (Календарь) -->
@@ -126,7 +142,7 @@
             <div>
                 <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded font-bold mr-2 text-sm">← Назад</button>
                 <span class="text-lg md:text-xl font-bold" id="scan-car-number">АВТОМОБИЛЬ</span>
-                <span id="scan-doc-type" class="ml-2 text-sm px-2 py-1 rounded font-bold shadow-sm"></span>
+                <span id="scan-doc-type" class="ml-2 text-sm px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block"></span>
             </div>
             <div class="flex gap-2 items-center">
                 <div class="text-right mr-2">
@@ -139,19 +155,48 @@
 
         <div id="scan-alert-bar" class="hidden bg-red-600 text-white p-3 text-center font-bold text-sm md:text-base animate-pulse shrink-0 shadow-md z-10 border-b-4 border-red-800"></div>
 
-        <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+            
             <div id="scan-flash-area" class="flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b md:border-b-0 md:border-r overflow-y-auto">
                 <input type="text" id="scanner-input" autocomplete="off" class="w-full max-w-2xl text-center text-2xl md:text-4xl font-mono border-4 border-blue-400 rounded-lg p-4 md:p-6 shadow-inner focus:outline-none focus:border-blue-600 focus:bg-blue-50" placeholder="Сканируйте штрих-код...">
                 <button onclick="document.getElementById('scanner-input').focus()" class="mt-4 text-sm text-blue-500 underline font-bold">Вернуть фокус сканеру</button>
                 <div id="scan-last-result" class="mt-6 text-center h-24 flex flex-col justify-center"></div>
             </div>
 
-            <div class="w-full md:w-1/3 lg:w-1/4 bg-gray-50 flex flex-col shrink-0 h-1/2 md:h-full">
+            <div class="w-full md:w-1/3 lg:w-1/4 bg-gray-50 flex flex-col shrink-0 h-1/2 md:h-full relative">
                 <div class="bg-gray-200 p-2 text-center font-bold text-sm text-gray-700 shadow-sm z-10">План работы</div>
                 <div class="flex-1 overflow-y-auto p-2">
                     <ul id="manifest-items-list" class="space-y-2"></ul>
                 </div>
+                
+                <!-- ПЛАВАЮЩАЯ КНОПКА ЧАТА ДЛЯ СКЛАДА -->
+                <button onclick="openChatPanel()" class="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full h-14 w-14 flex items-center justify-center shadow-xl z-20 text-2xl transition transform hover:scale-110">
+                    💬
+                    <span id="scan-chat-badge" class="hidden absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 border-2 border-white flex items-center justify-center">!</span>
+                </button>
             </div>
+        </div>
+    </div>
+
+    <!-- ВЫЕЗЖАЮЩАЯ ПАНЕЛЬ ЧАТА -->
+    <div id="chat-panel" class="fixed right-0 top-0 h-full w-full md:w-96 bg-gray-50 shadow-2xl transform translate-x-full transition-transform z-50 flex flex-col border-l border-gray-300">
+        <div class="bg-blue-800 text-white p-4 flex justify-between items-center shrink-0 shadow">
+            <h3 class="font-bold flex items-center gap-2">💬 Чат: <span id="chat-title-car"></span></h3>
+            <button onclick="closeChatPanel()" class="text-white hover:text-gray-300 text-2xl font-bold">&times;</button>
+        </div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white"></div>
+        
+        <!-- Блок быстрых ответов (только для склада) -->
+        <div id="chat-quick-replies" class="p-2 grid grid-cols-2 gap-2 bg-gray-200 border-t shrink-0">
+            <button onclick="sendChatMessage('📦 Груз поврежден')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">📦 Груз поврежден</button>
+            <button onclick="sendChatMessage('🛑 Нет места в авто')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">🛑 Нет места в авто</button>
+            <button onclick="sendChatMessage('❓ Штрих-код не читается')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">❓ Штрих-код не читается</button>
+            <button onclick="sendChatMessage('✅ Загрузка завершена')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">✅ Загрузка завершена</button>
+        </div>
+
+        <div class="p-3 border-t bg-gray-100 flex gap-2 shrink-0">
+            <input type="text" id="chat-input" class="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-blue-500 shadow-inner" placeholder="Сообщение...">
+            <button onclick="sendChatMessage()" class="bg-blue-600 hover:bg-blue-700 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold shadow transition">➤</button>
         </div>
     </div>
 
@@ -166,6 +211,7 @@
     <script>
         // =========================================================================
         // НАСТРОЙКА ДОСТУПА (РОЛИ)
+        // Впишите сюда email-адреса ОФИСНЫХ сотрудников.
         // =========================================================================
         const ADMIN_EMAILS = [
             'skypochka.v@novapost.pl',
@@ -179,6 +225,7 @@
         
         let isAdmin = false;
         let currentDate = new Date();
+        window.currentActivity = "Смотрит Главный экран"; // Текущая активность
 
         const firebaseConfig = {
           apiKey: "AIzaSyBUp11R-Sq46IrW9lwH5uFjXXzli5OASsU",
@@ -196,9 +243,12 @@
         let currentUser = null;
         let unsubscribeManifests = null;
         let unsubscribeCurrentScan = null;
+        let unsubscribeChat = null;
         let currentManifestDoc = null; 
         let editingManifestId = null;
+        let activeChatManifestId = null;
         
+        // --- ЗВУКОВАЯ СИСТЕМА ---
         let audioCtx = null;
         
         function unlockAudio() {
@@ -247,17 +297,79 @@
             }
         }
 
+        function playChatPing() {
+            // Мягкий "бульк" для чата, чтобы не раздражало
+            playTone(600, 'sine', 0.1, 0.4);
+            setTimeout(() => playTone(800, 'sine', 0.15, 0.4), 150);
+        }
+
+        // --- СИСТЕМА ОНЛАЙН СТАТУСОВ (PRESENCE) ---
+        let presenceInterval = null;
+
+        async function updatePresence() {
+            if(!currentUser) return;
+            try {
+                await db.collection('presence').doc(currentUser.email).set({
+                    email: currentUser.email,
+                    role: isAdmin ? 'Офис' : 'Склад',
+                    activity: window.currentActivity,
+                    lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                }, {merge: true});
+            } catch(e) {}
+        }
+
+        function startPresenceTracker() {
+            updatePresence();
+            if(presenceInterval) clearInterval(presenceInterval);
+            presenceInterval = setInterval(updatePresence, 60000); // Раз в минуту
+
+            db.collection('presence').onSnapshot(snap => {
+                let onlineCount = 0;
+                let html = '';
+                const now = new Date();
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    if(!d.lastActive) return;
+                    const diff = (now - d.lastActive.toDate()) / 1000;
+                    if(diff < 150) { // Если активность была менее 2.5 минут назад
+                        onlineCount++;
+                        const roleColor = d.role === 'Офис' ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-800';
+                        html += `
+                            <div class="border-b py-2 last:border-0">
+                                <div class="flex items-center gap-1 text-sm">
+                                    <span class="text-green-500 text-xs">🟢</span> 
+                                    <span class="font-bold truncate">${d.email.split('@')[0]}</span>
+                                    <span class="text-[10px] px-1 rounded font-bold ${roleColor}">${d.role}</span>
+                                </div>
+                                <div class="text-xs text-gray-500 ml-4 truncate" title="${d.activity}">${d.activity}</div>
+                            </div>`;
+                    }
+                });
+                document.getElementById('online-count-badge').innerText = onlineCount;
+                document.getElementById('presence-list').innerHTML = html || '<div class="text-sm text-gray-500">Нет активных</div>';
+            });
+        }
+
+        function togglePresenceModal() {
+            const el = document.getElementById('presence-modal');
+            el.classList.toggle('hidden');
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if(currentUser) db.collection('presence').doc(currentUser.email).delete();
+        });
+
+
+        // --- КАЛЕНДАРЬ ---
         function updateDateDisplay() {
             const today = new Date();
             let label = currentDate.toLocaleDateString('ru-RU');
-            
             if (currentDate.toDateString() === today.toDateString()) {
                 label = "СЕГОДНЯ (" + label + ")";
                 document.getElementById('current-date-display').className = "font-bold text-lg md:text-xl text-green-700";
             } else {
                 document.getElementById('current-date-display').className = "font-bold text-lg md:text-xl text-blue-800";
             }
-            
             document.getElementById('current-date-display').innerText = label;
             document.getElementById('date-picker').value = currentDate.toISOString().split('T')[0];
         }
@@ -284,20 +396,24 @@
                 document.getElementById('dashboard-screen').classList.remove('hidden');
                 document.getElementById('date-ribbon').classList.remove('hidden');
                 
-                let roleLabel = isAdmin ? 'ОФИС' : 'СКЛАД';
+                let roleLabel = isAdmin ? 'ОФИС (Админ)' : 'СКЛАД';
                 document.getElementById('user-info').innerHTML = `${user.email} <span class="bg-blue-900 text-white px-2 py-0.5 rounded ml-2 text-xs font-bold">${roleLabel}</span>`;
                 
                 if (isAdmin) {
                     document.getElementById('create-btn').classList.remove('hidden');
+                    document.getElementById('chat-quick-replies').classList.add('hidden');
                 } else {
                     document.getElementById('create-btn').classList.add('hidden');
+                    document.getElementById('chat-quick-replies').classList.remove('hidden');
                 }
 
+                startPresenceTracker();
                 updateDateDisplay();
                 loadDashboard();
             } else {
                 currentUser = null;
                 isAdmin = false;
+                if(presenceInterval) clearInterval(presenceInterval);
                 document.getElementById('login-screen').classList.remove('hidden');
                 document.getElementById('dashboard-screen').classList.add('hidden');
                 document.getElementById('date-ribbon').classList.add('hidden');
@@ -314,8 +430,12 @@
             });
         }
 
-        function logout() { auth.signOut(); }
+        function logout() { 
+            if(currentUser) db.collection('presence').doc(currentUser.email).delete();
+            auth.signOut(); 
+        }
 
+        // --- ПАРСЕР ---
         function parseExcelData(text) {
             const lines = text.split('\n');
             const items = [];
@@ -390,7 +510,6 @@
                     pcs: pcs
                 });
             });
-
             return items;
         }
 
@@ -529,6 +648,9 @@
                         items: newItemsParsed,
                         errors: [],
                         editHistory: [],
+                        messages: [], // Для чата
+                        unreadByOffice: false,
+                        unreadByWarehouse: false,
                         modified: false,
                         status: 'pending'
                     });
@@ -547,7 +669,11 @@
             }
         }
 
+        // --- ДАШБОРД ---
         function loadDashboard() {
+            window.currentActivity = "Смотрит Главный экран";
+            updatePresence();
+
             if (unsubscribeManifests) unsubscribeManifests();
             
             const startOfDay = new Date(currentDate);
@@ -602,7 +728,7 @@
                             if (diffSecs >= 0) {
                                 let h = Math.floor(diffSecs / 3600);
                                 let m = Math.floor((diffSecs % 3600) / 60);
-                                durationHtml = `<div class="text-xs text-gray-700 mt-2 font-bold bg-white bg-opacity-50 p-1 rounded inline-block">⏱ Время работы: ${h > 0 ? h + ' ч ' : ''}${m} мин</div>`;
+                                durationHtml = `<div class="text-xs text-gray-700 mt-2 font-bold bg-white bg-opacity-50 p-1 rounded inline-block">⏱ Время: ${h > 0 ? h + ' ч ' : ''}${m} мин</div>`;
                             }
                         }
 
@@ -639,23 +765,29 @@
 
                         const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
                         
+                        // Кнопки управления (Офис)
                         let adminButtons = '';
                         if (isAdmin) {
                             adminButtons = `
-                                <div class="absolute top-2 right-2 flex gap-1 z-10">
-                                    <button onclick="editManifest(event, '${doc.id}')" class="text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Редактировать">✏️</button>
-                                    <button onclick="deleteManifest(event, '${doc.id}')" class="text-gray-600 hover:text-red-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Удалить">✖</button>
-                                </div>
+                                <button onclick="editManifest(event, '${doc.id}')" class="text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Редактировать">✏️</button>
+                                <button onclick="deleteManifest(event, '${doc.id}')" class="text-gray-600 hover:text-red-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Удалить">✖</button>
                             `;
                         }
+                        
+                        // Индикатор Чата
+                        const hasUnread = isAdmin ? data.unreadByOffice : data.unreadByWarehouse;
+                        const chatBadge = hasUnread ? `<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>` : '';
 
                         grid.innerHTML += `
                             <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${cardClass} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
-                                ${adminButtons}
-                                <div class="mb-3 pr-16">
+                                <div class="absolute top-2 right-2 flex gap-1 z-10">
+                                    <button onclick="openChatPanel(event, '${doc.id}', '${data.carNumber}')" class="relative text-blue-600 bg-blue-50 hover:bg-blue-100 rounded p-1 shadow-sm border border-blue-200 transition mr-1" title="Чат">💬${chatBadge}</button>
+                                    ${adminButtons}
+                                </div>
+                                <div class="mb-3 pr-24">
                                     ${typeBadge}
                                 </div>
-                                <div class="flex justify-between items-end mb-2 pr-16">
+                                <div class="flex justify-between items-end mb-2 pr-24">
                                     <h3 class="text-xl font-bold ${textColor} leading-none">${data.carNumber}</h3>
                                     <span class="text-sm font-bold ${textColor}">${scannedPlaces} / ${totalPlaces} мест</span>
                                 </div>
@@ -670,22 +802,23 @@
                     });
 
                     if (itemsShown === 0) {
-                        grid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10">За выбранную дату (${currentDate.toLocaleDateString('ru-RU')}) ведомостей нет.</div>`;
+                        grid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10 font-bold">За выбранную дату (${currentDate.toLocaleDateString('ru-RU')}) машин нет.</div>`;
                     }
                 });
         }
 
-        let currentScanId = null;
-
+        // --- СКАНЕР ---
         function openScanner(id, carNumber) {
             currentScanId = id;
+            window.currentActivity = `В авто: ${carNumber}`;
+            updatePresence();
+            
             document.getElementById('dashboard-screen').classList.add('hidden');
             document.getElementById('date-ribbon').classList.add('hidden');
             document.getElementById('scan-screen').classList.remove('hidden');
             document.getElementById('scan-car-number').innerText = carNumber;
             
             document.getElementById('sound-unlock-overlay').style.display = 'flex';
-            
             const input = document.getElementById('scanner-input');
             input.value = '';
 
@@ -700,12 +833,22 @@
                     const actionWord = document.getElementById('scan-action-word');
                     if (isLoad) {
                         docTypeBadge.innerText = 'ЗАГРУЗКА';
-                        docTypeBadge.className = 'ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold';
+                        docTypeBadge.className = 'ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block';
                         actionWord.innerText = 'загружено';
                     } else {
                         docTypeBadge.innerText = 'ВЫГРУЗКА';
-                        docTypeBadge.className = 'ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold';
+                        docTypeBadge.className = 'ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block';
                         actionWord.innerText = 'выгружено';
+                    }
+
+                    // Чат бейдж
+                    const hasUnread = isAdmin ? data.unreadByOffice : data.unreadByWarehouse;
+                    const chatBadge = document.getElementById('scan-chat-badge');
+                    if (hasUnread) {
+                        chatBadge.classList.remove('hidden');
+                        if (!isAdmin) playChatPing(); // Звук только для склада, чтобы обратить внимание
+                    } else {
+                        chatBadge.classList.add('hidden');
                     }
 
                     let totalPlaces = 0;
@@ -786,6 +929,8 @@
         }
 
         function closeScanner() {
+            window.currentActivity = "Смотрит Главный экран";
+            updatePresence();
             if (unsubscribeCurrentScan) unsubscribeCurrentScan();
             currentScanId = null;
             document.getElementById('scan-screen').classList.add('hidden');
@@ -917,6 +1062,81 @@
             document.getElementById('scanner-input').focus(); 
         }
 
+        // --- ВНУТРЕННИЙ ЧАТ ---
+        function openChatPanel(e, manifestId = currentScanId, carNum = currentManifestDoc?.carNumber) {
+            if(e) e.stopPropagation();
+            activeChatManifestId = manifestId;
+            document.getElementById('chat-title-car').innerText = carNum || '';
+            document.getElementById('chat-panel').classList.remove('translate-x-full');
+            
+            // Сбрасываем счетчик непрочитанных для себя
+            const updateField = isAdmin ? { unreadByOffice: false } : { unreadByWarehouse: false };
+            db.collection('manifests').doc(manifestId).update(updateField);
+
+            if(unsubscribeChat) unsubscribeChat();
+            unsubscribeChat = db.collection('manifests').doc(manifestId).onSnapshot(doc => {
+                if(!doc.exists) return;
+                const data = doc.data();
+                const msgs = data.messages || [];
+                const container = document.getElementById('chat-messages');
+                
+                container.innerHTML = msgs.map(m => {
+                    const isMe = m.sender === currentUser.email;
+                    const align = isMe ? 'text-right' : 'text-left';
+                    const bg = isMe ? 'bg-blue-100 text-blue-900' : 'bg-gray-200 text-gray-800';
+                    const date = new Date(m.timestamp).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+                    const name = m.sender.split('@')[0];
+                    return `
+                        <div class="${align} mb-3">
+                            <div class="text-[10px] text-gray-500 mb-0.5 font-bold">${m.senderRole} (${name}) • ${date}</div>
+                            <div class="inline-block p-2 rounded-lg ${bg} text-sm shadow-sm text-left max-w-[85%]">${m.text}</div>
+                        </div>`;
+                }).join('');
+                
+                // Прокрутка вниз
+                container.scrollTop = container.scrollHeight;
+                
+                // Если мы в чате и сообщение пришло, помечаем как прочитанное (чтобы бейдж не загорался)
+                if (isAdmin && data.unreadByOffice) db.collection('manifests').doc(manifestId).update({unreadByOffice: false});
+                if (!isAdmin && data.unreadByWarehouse) db.collection('manifests').doc(manifestId).update({unreadByWarehouse: false});
+            });
+        }
+
+        function closeChatPanel() {
+            document.getElementById('chat-panel').classList.add('translate-x-full');
+            if(unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
+            activeChatManifestId = null;
+            document.getElementById('scanner-input')?.focus();
+        }
+
+        document.getElementById('chat-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+
+        async function sendChatMessage(quickText = null) {
+            const input = document.getElementById('chat-input');
+            const text = quickText || input.value.trim();
+            if (!text || !activeChatManifestId) return;
+            
+            input.value = ''; // очищаем сразу для отзывчивости
+
+            await db.collection('manifests').doc(activeChatManifestId).update({
+                messages: firebase.firestore.FieldValue.arrayUnion({
+                    text: text,
+                    sender: currentUser.email,
+                    senderRole: isAdmin ? 'Офис' : 'Склад',
+                    timestamp: new Date().toISOString()
+                }),
+                unreadByOffice: !isAdmin,     // Если пишет склад - непрочитано для офиса
+                unreadByWarehouse: isAdmin    // Если пишет офис - непрочитано для склада
+            });
+        }
+
+
+        // --- ПЕЧАТЬ PDF ---
         function generatePDF() {
             if (!currentManifestDoc) return;
             const data = currentManifestDoc;
