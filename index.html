@@ -68,7 +68,6 @@
                 <button onclick="togglePresenceModal()" class="text-xs md:text-sm bg-blue-900 hover:bg-blue-700 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-600 transition shadow">
                     <span class="animate-pulse">🟢</span> В сети: <span id="online-count-badge" class="font-bold">0</span>
                 </button>
-                <!-- Выпадающий список -->
                 <div id="presence-modal" class="hidden absolute top-10 right-0 bg-white shadow-2xl border rounded-lg w-64 text-gray-800 p-3 z-50">
                     <h4 class="font-bold border-b pb-2 mb-2 text-sm flex justify-between">
                         Активные сейчас
@@ -186,7 +185,6 @@
         </div>
         <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white"></div>
         
-        <!-- Блок быстрых ответов (только для склада) -->
         <div id="chat-quick-replies" class="p-2 grid grid-cols-2 gap-2 bg-gray-200 border-t shrink-0">
             <button onclick="sendChatMessage('📦 Груз поврежден')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">📦 Груз поврежден</button>
             <button onclick="sendChatMessage('🛑 Нет места в авто')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">🛑 Нет места в авто</button>
@@ -226,6 +224,9 @@
         let currentDate = new Date();
         window.currentActivity = "Смотрит Главный экран";
 
+        // Глобальный счетчик сообщений для отслеживания ТОЛЬКО НОВЫХ
+        let previousMessageCounts = {};
+
         const firebaseConfig = {
           apiKey: "AIzaSyBUp11R-Sq46IrW9lwH5uFjXXzli5OASsU",
           authDomain: "sklad-app-b04e3.firebaseapp.com",
@@ -249,10 +250,24 @@
         
         // --- ЗВУКОВАЯ СИСТЕМА ---
         let audioCtx = null;
+
+        // Глобальная разблокировка звука по первому клику на экране
+        document.addEventListener('click', () => {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
         
         function unlockAudio() {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioContext();
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
             
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
@@ -296,9 +311,25 @@
             }
         }
 
-        function playChatPing() {
-            playTone(600, 'sine', 0.1, 0.4);
-            setTimeout(() => playTone(800, 'sine', 0.15, 0.4), 150);
+        function playBloop() {
+            if(!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const play = (freq, startTime) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(0.5, startTime + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(startTime);
+                osc.stop(startTime + 0.15);
+            };
+            // Приятный "Бульк"
+            play(500, audioCtx.currentTime);
+            play(700, audioCtx.currentTime + 0.15);
         }
 
         // --- СИСТЕМА ОНЛАЙН СТАТУСОВ (PRESENCE) ---
@@ -330,7 +361,7 @@
                     if(!d.lastActive) return;
                     
                     let diff = (now - d.lastActive.toDate()) / 1000;
-                    if (diff < 0) diff = 0; // Защита от кривого времени на телефоне клиента
+                    if (diff < 0) diff = 0; 
                     
                     if(diff < 300) { // Активность за последние 5 минут
                         onlineCount++;
@@ -403,10 +434,10 @@
                 
                 if (isAdmin) {
                     document.getElementById('create-btn').classList.remove('hidden');
-                    document.getElementById('chat-quick-replies').classList.add('hidden'); // Офису не нужны быстрые кнопки
+                    document.getElementById('chat-quick-replies').classList.add('hidden'); 
                 } else {
                     document.getElementById('create-btn').classList.add('hidden');
-                    document.getElementById('chat-quick-replies').classList.remove('hidden'); // Складу нужны
+                    document.getElementById('chat-quick-replies').classList.remove('hidden'); 
                 }
 
                 startPresenceTracker();
@@ -423,6 +454,13 @@
         });
 
         function login() {
+            // Пытаемся разблокировать звук при клике на кнопку логина
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
             const e = document.getElementById('email').value.trim();
             const p = document.getElementById('password').value.trim();
             const err = document.getElementById('login-error');
@@ -673,7 +711,7 @@
             }
         }
 
-        // --- ДАШБОРД (ГЛАВНЫЙ ЭКРАН) ---
+        // --- ДАШБОРД ---
         function loadDashboard() {
             window.currentActivity = "Смотрит Главный экран";
             updatePresence();
@@ -688,6 +726,30 @@
             unsubscribeManifests = db.collection('manifests')
                 .orderBy('createdAt', 'desc')
                 .onSnapshot(snapshot => {
+                    // ФИКСАЦИЯ НОВЫХ СООБЩЕНИЙ ДЛЯ ЗВУКА "БУЛЬК"
+                    let isInitialLoad = Object.keys(previousMessageCounts).length === 0;
+
+                    snapshot.docChanges().forEach(change => {
+                        const data = change.doc.data();
+                        const msgCount = data.messages ? data.messages.length : 0;
+                        
+                        if (change.type === 'added' || change.type === 'modified') {
+                            const prevCount = previousMessageCounts[change.doc.id] || 0;
+                            if (!isInitialLoad && msgCount > prevCount) {
+                                const lastMsg = data.messages[msgCount - 1];
+                                // Если сообщение прислал КТО-ТО ДРУГОЙ, делаем Бульк
+                                if (lastMsg && lastMsg.sender !== currentUser.email) {
+                                    playBloop();
+                                }
+                            }
+                            previousMessageCounts[change.doc.id] = msgCount;
+                        }
+                        if (change.type === 'removed') {
+                            delete previousMessageCounts[change.doc.id];
+                        }
+                    });
+
+
                     const grid = document.getElementById('manifests-grid');
                     grid.innerHTML = '';
                     let itemsShown = 0;
@@ -714,6 +776,7 @@
                                 needsReturn = true;
                                 returnList.push(`${i.code} (${i.scannedPlaces} шт)`);
                             }
+
                             if (i.status !== 'removed') {
                                 totalPlaces += (i.totalPlaces || 1);
                                 scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
@@ -769,7 +832,7 @@
 
                         const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
                         
-                        // Индикатор Чата (Кнопка чата доступна всем прямо на карточке)
+                        // Индикатор Чата на Дашборде
                         const hasUnread = isAdmin ? data.unreadByOffice : data.unreadByWarehouse;
                         const chatBadge = hasUnread ? `<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>` : '';
 
@@ -845,14 +908,11 @@
                         actionWord.innerText = 'выгружено';
                     }
 
-                    // Чат бейдж для плавающей кнопки (только внутри сканера)
+                    // Чат бейдж для плавающей кнопки (внутри сканера)
                     const hasUnread = isAdmin ? data.unreadByOffice : data.unreadByWarehouse;
                     const chatBadge = document.getElementById('scan-chat-badge');
                     if (hasUnread) {
                         chatBadge.classList.remove('hidden');
-                        if (!isAdmin && document.getElementById('chat-panel').classList.contains('translate-x-full')) {
-                            playChatPing(); // Звук для склада, если панель чата закрыта
-                        }
                     } else {
                         chatBadge.classList.add('hidden');
                     }
@@ -1072,9 +1132,8 @@
         function openChatPanel(e, manifestId = null, carNum = null) {
             if(e) e.stopPropagation();
             
-            // Если открываем со страницы дашборда
             if (manifestId) activeChatManifestId = manifestId;
-            else activeChatManifestId = currentScanId; // Если из сканера
+            else activeChatManifestId = currentScanId; 
             
             if (!carNum && currentManifestDoc) carNum = currentManifestDoc.carNumber;
             
