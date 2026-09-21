@@ -22,11 +22,9 @@
         .flash-green { animation: flashGreen 1s ease-out; }
         .flash-red { animation: flashRed 2s ease-out; }
         .flash-orange { animation: flashOrange 1s ease-out; }
-        
         .urgent-blink { animation: urgentBlink 1.5s infinite; border-width: 4px; }
         
         #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(239, 68, 68, 0.95); z-index: 50; justify-content: center; align-items: center; flex-direction: column; color: white; }
-        
         #sound-unlock-overlay { display: none; position: absolute; inset: 0; background-color: rgba(30, 58, 138, 0.95); z-index: 40; justify-content: center; align-items: center; flex-direction: column; color: white; }
 
         @media print {
@@ -67,11 +65,22 @@
         <button onclick="logout()" class="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded">Выйти</button>
     </header>
 
+    <!-- ПАНЕЛЬ АРХИВА ДАТ (Календарь) -->
+    <div id="date-ribbon" class="bg-white shadow-sm px-4 py-3 flex justify-between items-center no-print shrink-0 border-b z-10 hidden">
+        <button onclick="changeDate(-1)" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-bold text-sm shadow-sm transition">&larr; Пред</button>
+        <div class="flex items-center gap-2">
+            <span id="current-date-display" class="font-bold text-lg md:text-xl text-blue-800">Сегодня</span>
+            <input type="date" id="date-picker" onchange="setDateFromPicker(this.value)" class="border rounded px-2 py-1 text-sm bg-gray-50 text-gray-700 cursor-pointer shadow-inner focus:outline-none focus:border-blue-500">
+        </div>
+        <button onclick="changeDate(1)" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-bold text-sm shadow-sm transition">След &rarr;</button>
+    </div>
+
     <!-- Главный экран -->
-    <div id="dashboard-screen" class="flex-1 overflow-auto p-4 hidden no-print">
+    <div id="dashboard-screen" class="flex-1 overflow-auto p-4 hidden no-print relative">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h2 class="text-2xl font-bold">Активные ведомости</h2>
-            <button onclick="showCreateForm()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow w-full sm:w-auto">
+            <h2 class="text-2xl font-bold text-gray-700" id="dashboard-title">Ведомости на день</h2>
+            
+            <button id="create-btn" onclick="showCreateForm()" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow-md w-full sm:w-auto transition transform hover:scale-105">
                 + Создать ведомость
             </button>
         </div>
@@ -98,14 +107,13 @@
 
             <div class="flex justify-end gap-2">
                 <button onclick="hideCreateForm()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 font-bold">Отмена</button>
-                <button onclick="saveManifest()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Сохранить</button>
+                <button onclick="saveManifest()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold shadow-md">Сохранить</button>
             </div>
         </div>
     </div>
 
     <!-- Экран сканирования -->
     <div id="scan-screen" class="hidden flex-1 flex flex-col no-print bg-white overflow-hidden relative">
-        
         <div id="sound-unlock-overlay" class="flex">
             <h2 class="text-3xl font-bold mb-8 text-center px-4">Режим сканирования</h2>
             <button onclick="unlockAudio()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-6 px-12 rounded-full text-2xl shadow-2xl animate-pulse">
@@ -114,40 +122,34 @@
             <p class="mt-6 text-blue-200 text-center px-4">Внимание: Убедитесь, что на телефоне НЕ включен беззвучный режим!</p>
         </div>
 
-        <div class="bg-gray-200 p-4 flex justify-between items-center border-b shrink-0 z-20">
+        <div class="bg-gray-200 p-4 flex justify-between items-center border-b shrink-0 z-20 shadow-sm">
             <div>
                 <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded font-bold mr-2 text-sm">← Назад</button>
                 <span class="text-lg md:text-xl font-bold" id="scan-car-number">АВТОМОБИЛЬ</span>
-                <span id="scan-doc-type" class="ml-2 text-sm px-2 py-1 rounded font-bold"></span>
+                <span id="scan-doc-type" class="ml-2 text-sm px-2 py-1 rounded font-bold shadow-sm"></span>
             </div>
             <div class="flex gap-2 items-center">
                 <div class="text-right mr-2">
                     <div class="text-xl md:text-2xl font-bold text-blue-600"><span id="scan-count">0</span> / <span id="scan-total">0</span></div>
                     <div class="text-xs text-gray-500 font-bold" id="scan-action-word">обработано</div>
                 </div>
-                <button onclick="generatePDF()" class="bg-blue-600 text-white px-3 py-2 rounded font-bold text-sm">Акт</button>
+                <button onclick="generatePDF()" class="bg-blue-600 text-white px-3 py-2 rounded font-bold text-sm shadow">Акт</button>
             </div>
         </div>
 
-        <div id="scan-alert-bar" class="hidden bg-red-600 text-white p-3 text-center font-bold text-sm md:text-base animate-pulse shrink-0 shadow-md z-10 border-b-4 border-red-800">
-        </div>
+        <div id="scan-alert-bar" class="hidden bg-red-600 text-white p-3 text-center font-bold text-sm md:text-base animate-pulse shrink-0 shadow-md z-10 border-b-4 border-red-800"></div>
 
         <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
             <div id="scan-flash-area" class="flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b md:border-b-0 md:border-r overflow-y-auto">
                 <input type="text" id="scanner-input" autocomplete="off" class="w-full max-w-2xl text-center text-2xl md:text-4xl font-mono border-4 border-blue-400 rounded-lg p-4 md:p-6 shadow-inner focus:outline-none focus:border-blue-600 focus:bg-blue-50" placeholder="Сканируйте штрих-код...">
-                <button onclick="document.getElementById('scanner-input').focus()" class="mt-4 text-sm text-blue-500 underline">Вернуть фокус сканеру</button>
-                
-                <div id="scan-last-result" class="mt-6 text-center h-24"></div>
+                <button onclick="document.getElementById('scanner-input').focus()" class="mt-4 text-sm text-blue-500 underline font-bold">Вернуть фокус сканеру</button>
+                <div id="scan-last-result" class="mt-6 text-center h-24 flex flex-col justify-center"></div>
             </div>
 
             <div class="w-full md:w-1/3 lg:w-1/4 bg-gray-50 flex flex-col shrink-0 h-1/2 md:h-full">
-                <div class="bg-gray-200 p-2 text-center font-bold text-sm text-gray-700 shadow-sm z-10">
-                    План работы (документы)
-                </div>
+                <div class="bg-gray-200 p-2 text-center font-bold text-sm text-gray-700 shadow-sm z-10">План работы</div>
                 <div class="flex-1 overflow-y-auto p-2">
-                    <ul id="manifest-items-list" class="space-y-2">
-                        <!-- Список -->
-                    </ul>
+                    <ul id="manifest-items-list" class="space-y-2"></ul>
                 </div>
             </div>
         </div>
@@ -156,12 +158,28 @@
     <div id="error-overlay">
         <h1 class="text-4xl md:text-6xl font-bold mb-4">ОШИБКА!</h1>
         <p class="text-xl md:text-2xl mb-8 text-center px-4" id="error-message">Неправильный номер</p>
-        <button onclick="closeErrorOverlay()" class="bg-white text-red-600 font-bold py-4 px-12 rounded-full text-xl md:text-2xl hover:bg-gray-100">ЗАКРЫТЬ</button>
+        <button onclick="closeErrorOverlay()" class="bg-white text-red-600 font-bold py-4 px-12 rounded-full text-xl md:text-2xl hover:bg-gray-100 shadow-lg">ЗАКРЫТЬ</button>
     </div>
 
     <div id="print-area" class="hidden bg-white"></div>
 
     <script>
+        // =========================================================================
+        // НАСТРОЙКА ДОСТУПА (РОЛИ)
+        // =========================================================================
+        const ADMIN_EMAILS = [
+            'skypochka.v@novapost.pl',
+            'mazuryk.o@novapost.pl',
+            'herasymov.d@novapost.pl',
+            'shelemon.a@novapost.pl',
+            'kyzhlai.o@novapost.pl',
+            'yeremenko.m@novapost.pl',
+            'kryvonozhkin.o@novapost.pl'
+        ]; 
+        
+        let isAdmin = false;
+        let currentDate = new Date();
+
         const firebaseConfig = {
           apiKey: "AIzaSyBUp11R-Sq46IrW9lwH5uFjXXzli5OASsU",
           authDomain: "sklad-app-b04e3.firebaseapp.com",
@@ -206,8 +224,11 @@
             const gain = audioCtx.createGain();
             osc.type = type;
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            
             gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime + duration - 0.05);
             gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+            
             osc.connect(gain);
             gain.connect(audioCtx.destination);
             osc.start();
@@ -215,18 +236,85 @@
         }
 
         function playSuccessSound() {
-            playTone(880, 'sine', 0.1, 0.5); 
-            setTimeout(() => playTone(1108, 'sine', 0.2, 0.5), 100);
+            playTone(1200, 'square', 0.15, 1); 
+            setTimeout(() => playTone(1800, 'square', 0.25, 1), 200);
         }
 
         function playErrorSound() {
-            for (let i = 0; i < 5; i++) {
-                setTimeout(() => {
-                    playTone(250, 'square', 0.3, 0.5);
-                    playTone(255, 'sawtooth', 0.3, 0.5);
-                }, i * 400); 
+            for (let i = 0; i < 6; i++) {
+                setTimeout(() => playTone(1000, 'sawtooth', 0.25, 1), i * 500);
+                setTimeout(() => playTone(700, 'sawtooth', 0.25, 1), i * 500 + 250);
             }
         }
+
+        function updateDateDisplay() {
+            const today = new Date();
+            let label = currentDate.toLocaleDateString('ru-RU');
+            
+            if (currentDate.toDateString() === today.toDateString()) {
+                label = "СЕГОДНЯ (" + label + ")";
+                document.getElementById('current-date-display').className = "font-bold text-lg md:text-xl text-green-700";
+            } else {
+                document.getElementById('current-date-display').className = "font-bold text-lg md:text-xl text-blue-800";
+            }
+            
+            document.getElementById('current-date-display').innerText = label;
+            document.getElementById('date-picker').value = currentDate.toISOString().split('T')[0];
+        }
+
+        function changeDate(offset) {
+            currentDate.setDate(currentDate.getDate() + offset);
+            updateDateDisplay();
+            loadDashboard();
+        }
+
+        function setDateFromPicker(val) {
+            if (!val) return;
+            currentDate = new Date(val);
+            updateDateDisplay();
+            loadDashboard();
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
+                
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('dashboard-screen').classList.remove('hidden');
+                document.getElementById('date-ribbon').classList.remove('hidden');
+                
+                let roleLabel = isAdmin ? 'ОФИС' : 'СКЛАД';
+                document.getElementById('user-info').innerHTML = `${user.email} <span class="bg-blue-900 text-white px-2 py-0.5 rounded ml-2 text-xs font-bold">${roleLabel}</span>`;
+                
+                if (isAdmin) {
+                    document.getElementById('create-btn').classList.remove('hidden');
+                } else {
+                    document.getElementById('create-btn').classList.add('hidden');
+                }
+
+                updateDateDisplay();
+                loadDashboard();
+            } else {
+                currentUser = null;
+                isAdmin = false;
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('dashboard-screen').classList.add('hidden');
+                document.getElementById('date-ribbon').classList.add('hidden');
+            }
+        });
+
+        function login() {
+            const e = document.getElementById('email').value.trim();
+            const p = document.getElementById('password').value.trim();
+            const err = document.getElementById('login-error');
+            auth.signInWithEmailAndPassword(e, p).catch(error => {
+                err.innerText = "Ошибка входа!";
+                err.classList.remove('hidden');
+            });
+        }
+
+        function logout() { auth.signOut(); }
 
         function parseExcelData(text) {
             const lines = text.split('\n');
@@ -242,14 +330,10 @@
 
                 if (line.includes('\t')) {
                     const cols = line.split('\t').map(c => c.trim());
-                    
                     let codeCol = "";
                     for (let i = 0; i < Math.min(3, cols.length); i++) {
-                        if (cols[i].length > codeCol.length) {
-                            codeCol = cols[i];
-                        }
+                        if (cols[i].length > codeCol.length) codeCol = cols[i];
                     }
-                    
                     if (codeCol.includes('/')) codeCol = codeCol.split('/')[0];
                     code = codeCol.trim().toUpperCase();
                     if (/^[A-Z]{2}MF/.test(code)) code = code.substring(2);
@@ -314,7 +398,6 @@
             const text = document.getElementById('new-manifests-list').value;
             const items = parseExcelData(text);
             const counter = document.getElementById('manifest-counter');
-            
             if (items.length > 0) {
                 const totalPallets = items.reduce((sum, item) => sum + item.totalPlaces, 0);
                 counter.innerText = `Распознано: ${items.length} манифестов (${totalPallets} палет)`;
@@ -324,31 +407,6 @@
                 counter.className = "text-gray-500 mb-4 h-6";
             }
         }
-
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                currentUser = user;
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('dashboard-screen').classList.remove('hidden');
-                document.getElementById('user-info').innerText = user.email;
-                loadDashboard();
-            } else {
-                currentUser = null;
-                document.getElementById('login-screen').classList.remove('hidden');
-            }
-        });
-
-        function login() {
-            const e = document.getElementById('email').value.trim();
-            const p = document.getElementById('password').value.trim();
-            const err = document.getElementById('login-error');
-            auth.signInWithEmailAndPassword(e, p).catch(error => {
-                err.innerText = "Ошибка входа!";
-                err.classList.remove('hidden');
-            });
-        }
-
-        function logout() { auth.signOut(); }
 
         function showCreateForm() {
             editingManifestId = null;
@@ -363,6 +421,8 @@
 
         async function editManifest(event, id) {
             event.stopPropagation();
+            if (!isAdmin) return;
+
             const docSnap = await db.collection('manifests').doc(id).get();
             if (!docSnap.exists) return;
             
@@ -407,12 +467,11 @@
                     let removedLog = [];
                     let changedLog = [];
 
-                    // Проверяем старые манифесты
                     oldItems.forEach(oldItem => {
                         const foundInNew = newItemsParsed.find(n => n.code === oldItem.code);
                         if (foundInNew) {
                             if (oldItem.totalPlaces !== foundInNew.totalPlaces) {
-                                changedLog.push(`${oldItem.code} (${oldItem.totalPlaces} шт ➡️ ${foundInNew.totalPlaces} шт)`);
+                                changedLog.push(`${oldItem.code} (${oldItem.totalPlaces} ➡️ ${foundInNew.totalPlaces} шт)`);
                             }
                             oldItem.totalPlaces = foundInNew.totalPlaces;
                             oldItem.brutto = foundInNew.brutto;
@@ -425,17 +484,14 @@
                             }
                             mergedItems.push(oldItem);
                         } else {
-                            // Удалили из списка
                             removedLog.push(oldItem.code);
                             if (oldItem.scannedPlaces > 0 && oldItem.status !== 'removed') {
                                 oldItem.isCancelled = true;
                                 mergedItems.push(oldItem);
                             } 
-                            // Если не сканировался - просто исчезает из mergedItems
                         }
                     });
 
-                    // Проверяем новые манифесты
                     newItemsParsed.forEach(newItem => {
                         const foundInOld = oldItems.find(o => o.code === newItem.code);
                         if (!foundInOld) {
@@ -485,6 +541,7 @@
 
         async function deleteManifest(event, id) {
             event.stopPropagation();
+            if (!isAdmin) return;
             if (confirm("Полностью удалить ведомость?")) {
                 await db.collection('manifests').doc(id).delete();
             }
@@ -493,15 +550,26 @@
         function loadDashboard() {
             if (unsubscribeManifests) unsubscribeManifests();
             
+            const startOfDay = new Date(currentDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(currentDate);
+            endOfDay.setHours(23, 59, 59, 999);
+
             unsubscribeManifests = db.collection('manifests')
                 .orderBy('createdAt', 'desc')
                 .onSnapshot(snapshot => {
                     const grid = document.getElementById('manifests-grid');
                     grid.innerHTML = '';
+                    let itemsShown = 0;
                     
                     snapshot.forEach(doc => {
                         const data = doc.data();
                         
+                        let docDate = data.createdAt ? data.createdAt.toDate() : new Date();
+                        if (docDate < startOfDay || docDate > endOfDay) return; 
+                        
+                        itemsShown++;
+
                         let totalPlaces = 0;
                         let scannedPlaces = 0;
                         let lastScanDt = null;
@@ -516,7 +584,6 @@
                                 needsReturn = true;
                                 returnList.push(`${i.code} (${i.scannedPlaces} шт)`);
                             }
-
                             if (i.status !== 'removed') {
                                 totalPlaces += (i.totalPlaces || 1);
                                 scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
@@ -531,8 +598,7 @@
 
                         let durationHtml = '';
                         if (isCompleted && data.createdAt && lastScanDt && !needsReturn) {
-                            let createdDt = typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(data.createdAt);
-                            let diffSecs = Math.floor((lastScanDt - createdDt) / 1000);
+                            let diffSecs = Math.floor((lastScanDt - docDate) / 1000);
                             if (diffSecs >= 0) {
                                 let h = Math.floor(diffSecs / 3600);
                                 let m = Math.floor((diffSecs % 3600) / 60);
@@ -544,7 +610,6 @@
                             ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold shadow-sm">ЗАГРУЗКА</span>'
                             : '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold shadow-sm">ВЫГРУЗКА</span>';
 
-                        // Индикатор простого изменения
                         if (data.modified && !isCompleted && !needsReturn) {
                             typeBadge += ' <span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded font-bold ml-1 shadow-sm">⚠️ ИЗМЕНЕНА</span>';
                         }
@@ -553,22 +618,14 @@
                             ? (isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400')
                             : (isCompleted ? 'bg-orange-100 border-orange-500' : 'bg-white border-purple-400');
                         
-                        // Если изменена и еще не завершена (без экстренного возврата) - делаем желтоватой
                         if (data.modified && !isCompleted && !needsReturn) {
                             cardClass = 'bg-yellow-50 border-yellow-400';
                         }
                         
-                        let textColor = isLoad 
-                            ? (isCompleted ? 'text-green-700' : 'text-blue-800')
-                            : (isCompleted ? 'text-orange-700' : 'text-purple-800');
-                            
-                        let barColor = isLoad 
-                            ? (isCompleted ? 'bg-green-500' : 'bg-blue-500')
-                            : (isCompleted ? 'bg-orange-500' : 'bg-purple-500');
+                        let textColor = isLoad ? (isCompleted ? 'text-green-700' : 'text-blue-800') : (isCompleted ? 'text-orange-700' : 'text-purple-800');
+                        let barColor = isLoad ? (isCompleted ? 'bg-green-500' : 'bg-blue-500') : (isCompleted ? 'bg-orange-500' : 'bg-purple-500');
 
                         let returnAlertHtml = '';
-
-                        // ЕСЛИ ЕСТЬ ОТМЕНЫ (Мигание и список)
                         if (needsReturn) {
                             cardClass = 'urgent-blink';
                             textColor = 'text-red-900';
@@ -581,13 +638,20 @@
                         }
 
                         const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
-
-                        grid.innerHTML += `
-                            <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${cardClass} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
+                        
+                        let adminButtons = '';
+                        if (isAdmin) {
+                            adminButtons = `
                                 <div class="absolute top-2 right-2 flex gap-1 z-10">
                                     <button onclick="editManifest(event, '${doc.id}')" class="text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Редактировать">✏️</button>
                                     <button onclick="deleteManifest(event, '${doc.id}')" class="text-gray-600 hover:text-red-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Удалить">✖</button>
                                 </div>
+                            `;
+                        }
+
+                        grid.innerHTML += `
+                            <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${cardClass} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
+                                ${adminButtons}
                                 <div class="mb-3 pr-16">
                                     ${typeBadge}
                                 </div>
@@ -604,6 +668,10 @@
                             </div>
                         `;
                     });
+
+                    if (itemsShown === 0) {
+                        grid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10">За выбранную дату (${currentDate.toLocaleDateString('ru-RU')}) ведомостей нет.</div>`;
+                    }
                 });
         }
 
@@ -612,6 +680,7 @@
         function openScanner(id, carNumber) {
             currentScanId = id;
             document.getElementById('dashboard-screen').classList.add('hidden');
+            document.getElementById('date-ribbon').classList.add('hidden');
             document.getElementById('scan-screen').classList.remove('hidden');
             document.getElementById('scan-car-number').innerText = carNumber;
             
@@ -721,6 +790,7 @@
             currentScanId = null;
             document.getElementById('scan-screen').classList.add('hidden');
             document.getElementById('dashboard-screen').classList.remove('hidden');
+            document.getElementById('date-ribbon').classList.remove('hidden');
         }
 
         document.getElementById('scanner-input').addEventListener('keypress', function(e) {
@@ -948,12 +1018,11 @@
 
             html += `</tbody></table>`;
 
-            // ИСТОРИЯ РЕДАКТИРОВАНИЙ (ЛОГИ)
             if (data.editHistory && data.editHistory.length > 0) {
                 html += `
-                    <h3 style="margin-top:30px; font-family: sans-serif; font-size: 16px;">История изменений ведомости:</h3>
+                    <h3 style="margin-top:30px; font-family: sans-serif; font-size: 16px;">История изменений ведомости (Офис):</h3>
                     <table class="print-table" style="margin-top: 10px;">
-                        <thead><tr><th>№</th><th>Дата и Время</th><th>Сотрудник (Офис)</th><th>Добавлены</th><th>Удалены</th><th>Изменено кол-во мест</th></tr></thead>
+                        <thead><tr><th>№</th><th>Дата и Время</th><th>Сотрудник</th><th>Добавлены</th><th>Удалены</th><th>Изменено кол-во мест</th></tr></thead>
                         <tbody>
                 `;
                 data.editHistory.forEach((log, index) => {
