@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Склад - Загрузка</title>
+    <title>Склад - Загрузка / Выгрузка</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -12,8 +12,10 @@
     <style>
         @keyframes flashGreen { 0% { background-color: #22c55e; } 100% { background-color: transparent; } }
         @keyframes flashRed { 0% { background-color: #ef4444; } 100% { background-color: transparent; } }
+        @keyframes flashOrange { 0% { background-color: #f97316; } 100% { background-color: transparent; } }
         .flash-green { animation: flashGreen 1s ease-out; }
         .flash-red { animation: flashRed 2s ease-out; }
+        .flash-orange { animation: flashOrange 1s ease-out; }
         
         #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(239, 68, 68, 0.95); z-index: 50; justify-content: center; align-items: center; flex-direction: column; color: white; }
         
@@ -51,7 +53,7 @@
     <!-- Верхняя панель -->
     <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center no-print shrink-0">
         <div>
-            <h1 class="text-xl font-bold">Склад - Загрузка</h1>
+            <h1 class="text-xl font-bold">Склад Контроль</h1>
             <p id="user-info" class="text-sm text-blue-200"></p>
         </div>
         <button onclick="logout()" class="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded">Выйти</button>
@@ -60,7 +62,7 @@
     <!-- Главный экран -->
     <div id="dashboard-screen" class="flex-1 overflow-auto p-4 hidden no-print">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h2 class="text-2xl font-bold">Автомобили на загрузку</h2>
+            <h2 class="text-2xl font-bold">Активные ведомости</h2>
             <button onclick="showCreateForm()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow w-full sm:w-auto">
                 + Создать ведомость
             </button>
@@ -68,11 +70,18 @@
         <div id="manifests-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     </div>
 
-    <!-- Форма создания -->
+    <!-- Форма создания / редактирования -->
     <div id="create-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center no-print p-4">
         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md md:max-w-xl">
-            <h3 class="text-xl font-bold mb-4">Новая ведомость</h3>
-            <input type="text" id="new-car-number" placeholder="Номер авто (АА 1234 ВВ)" class="w-full border rounded p-2 mb-4 font-bold text-lg">
+            <h3 id="modal-title" class="text-xl font-bold mb-4">Новая ведомость</h3>
+            
+            <div class="flex gap-4 mb-4">
+                <select id="new-manifest-type" class="w-1/2 border rounded p-2 font-bold text-sm bg-gray-50">
+                    <option value="load">🟢 ЗАГРУЗКА АВТО</option>
+                    <option value="unload">🟣 ВЫГРУЗКА ИЗ АВТО</option>
+                </select>
+                <input type="text" id="new-car-number" placeholder="Номер авто (АА 1234)" class="w-1/2 border rounded p-2 font-bold text-lg">
+            </div>
             
             <label class="block text-sm font-medium mb-1">Скопируйте таблицу из Excel и вставьте сюда:</label>
             <textarea id="new-manifests-list" rows="6" oninput="updateManifestCount()" placeholder="Вставьте скопированные данные..." class="w-full border rounded p-2 mb-1 font-mono text-xs whitespace-pre"></textarea>
@@ -81,7 +90,7 @@
 
             <div class="flex justify-end gap-2">
                 <button onclick="hideCreateForm()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 font-bold">Отмена</button>
-                <button onclick="saveManifest()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Создать</button>
+                <button onclick="saveManifest()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Сохранить</button>
             </div>
         </div>
     </div>
@@ -101,11 +110,12 @@
             <div>
                 <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded font-bold mr-2 text-sm">← Назад</button>
                 <span class="text-lg md:text-xl font-bold" id="scan-car-number">АВТОМОБИЛЬ</span>
+                <span id="scan-doc-type" class="ml-2 text-sm px-2 py-1 rounded font-bold"></span>
             </div>
             <div class="flex gap-2 items-center">
                 <div class="text-right mr-2">
                     <div class="text-xl md:text-2xl font-bold text-blue-600"><span id="scan-count">0</span> / <span id="scan-total">0</span></div>
-                    <div class="text-xs text-gray-500">мест (палет)</div>
+                    <div class="text-xs text-gray-500 font-bold" id="scan-action-word">обработано</div>
                 </div>
                 <button onclick="generatePDF()" class="bg-blue-600 text-white px-3 py-2 rounded font-bold text-sm">Акт</button>
             </div>
@@ -121,7 +131,7 @@
 
             <div class="w-full md:w-1/3 lg:w-1/4 bg-gray-50 flex flex-col shrink-0 h-1/2 md:h-full">
                 <div class="bg-gray-200 p-2 text-center font-bold text-sm text-gray-700 shadow-sm z-10">
-                    План загрузки (документы)
+                    План работы (документы)
                 </div>
                 <div class="flex-1 overflow-y-auto p-2">
                     <ul id="manifest-items-list" class="space-y-2">
@@ -158,6 +168,7 @@
         let unsubscribeManifests = null;
         let unsubscribeCurrentScan = null;
         let currentManifestDoc = null; 
+        let editingManifestId = null; // Для режима редактирования
         
         let audioCtx = null;
         
@@ -230,10 +241,7 @@
                     
                     if (codeCol.includes('/')) codeCol = codeCol.split('/')[0];
                     code = codeCol.trim().toUpperCase();
-                    
-                    if (/^[A-Z]{2}MF/.test(code)) {
-                        code = code.substring(2);
-                    }
+                    if (/^[A-Z]{2}MF/.test(code)) code = code.substring(2);
 
                     let paletaIdx = cols.findIndex(c => c.toLowerCase().includes('paleta'));
                     if (paletaIdx > 0) {
@@ -277,6 +285,7 @@
                 items.push({
                     code: code,
                     status: 'pending',
+                    isCancelled: false, // Флаг отмены для уже отсканированных при редактировании
                     totalPlaces: totalPlaces,
                     scannedPlaces: 0,
                     scannedBy: null,
@@ -331,9 +340,37 @@
         function logout() { auth.signOut(); }
 
         function showCreateForm() {
-            document.getElementById('create-modal').classList.remove('hidden');
+            editingManifestId = null;
+            document.getElementById('modal-title').innerText = 'Новая ведомость';
             document.getElementById('new-car-number').value = '';
             document.getElementById('new-manifests-list').value = '';
+            document.getElementById('new-manifest-type').disabled = false;
+            document.getElementById('new-manifest-type').value = 'load';
+            document.getElementById('create-modal').classList.remove('hidden');
+            updateManifestCount();
+        }
+
+        async function editManifest(event, id) {
+            event.stopPropagation();
+            const docSnap = await db.collection('manifests').doc(id).get();
+            if (!docSnap.exists) return;
+            
+            const data = docSnap.data();
+            editingManifestId = id;
+            
+            document.getElementById('modal-title').innerText = 'Редактирование ведомости';
+            document.getElementById('new-car-number').value = data.carNumber;
+            document.getElementById('new-manifest-type').value = data.docType || 'load';
+            document.getElementById('new-manifest-type').disabled = true; // Запрещаем менять тип на ходу
+            
+            // Восстанавливаем текст для textarea
+            const text = data.items
+                .filter(i => i.status !== 'removed')
+                .map(i => `${i.code}\t\t${i.totalPlaces} paleta\t\t${i.brutto}\t${i.netto}\t\t${i.pcs}`)
+                .join('\n');
+                
+            document.getElementById('new-manifests-list').value = text;
+            document.getElementById('create-modal').classList.remove('hidden');
             updateManifestCount();
         }
 
@@ -341,21 +378,71 @@
 
         async function saveManifest() {
             const car = document.getElementById('new-car-number').value.trim();
+            const docType = document.getElementById('new-manifest-type').value;
             const text = document.getElementById('new-manifests-list').value;
-            const items = parseExcelData(text);
+            const newItemsParsed = parseExcelData(text);
 
             if (!car) return alert("Введите номер автомобиля!");
-            if (items.length === 0) return alert("Не удалось распознать номера!");
+            if (newItemsParsed.length === 0) return alert("Не удалось распознать номера!");
             
             try {
-                await db.collection('manifests').add({
-                    carNumber: car,
-                    creatorEmail: currentUser.email,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    items: items,
-                    errors: [],
-                    status: 'pending'
-                });
+                if (editingManifestId) {
+                    // РЕЖИМ РЕДАКТИРОВАНИЯ
+                    const docRef = db.collection('manifests').doc(editingManifestId);
+                    const docSnap = await docRef.get();
+                    const oldItems = docSnap.data().items;
+                    let mergedItems = [];
+
+                    // Проверяем старые манифесты
+                    oldItems.forEach(oldItem => {
+                        const foundInNew = newItemsParsed.find(n => n.code === oldItem.code);
+                        if (foundInNew) {
+                            // Оставили в списке - обновляем данные
+                            oldItem.totalPlaces = foundInNew.totalPlaces;
+                            oldItem.brutto = foundInNew.brutto;
+                            oldItem.netto = foundInNew.netto;
+                            oldItem.pcs = foundInNew.pcs;
+                            oldItem.isCancelled = false;
+                            if (oldItem.status === 'removed') {
+                                oldItem.status = oldItem.scannedPlaces >= oldItem.totalPlaces ? 'scanned' : (oldItem.scannedPlaces > 0 ? 'partial' : 'pending');
+                            }
+                            mergedItems.push(oldItem);
+                        } else {
+                            // Удалили из списка
+                            if (oldItem.scannedPlaces > 0 && oldItem.status !== 'removed') {
+                                // Груз физически в машине! Ставим метку на возврат
+                                oldItem.isCancelled = true;
+                                mergedItems.push(oldItem);
+                            } else {
+                                // Никогда не сканировался - удаляем с концами (не добавляем в массив)
+                            }
+                        }
+                    });
+
+                    // Добавляем полностью новые манифесты
+                    newItemsParsed.forEach(newItem => {
+                        const foundInOld = oldItems.find(o => o.code === newItem.code);
+                        if (!foundInOld) {
+                            mergedItems.push(newItem);
+                        }
+                    });
+
+                    await docRef.update({ 
+                        carNumber: car,
+                        items: mergedItems 
+                    });
+                } else {
+                    // РЕЖИМ СОЗДАНИЯ
+                    await db.collection('manifests').add({
+                        carNumber: car,
+                        docType: docType,
+                        creatorEmail: currentUser.email,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        items: newItemsParsed,
+                        errors: [],
+                        status: 'pending'
+                    });
+                }
                 hideCreateForm();
             } catch (err) {
                 alert("Ошибка сохранения: " + err.message);
@@ -364,7 +451,7 @@
 
         async function deleteManifest(event, id) {
             event.stopPropagation();
-            if (confirm("Удалить ведомость?")) {
+            if (confirm("Полностью удалить ведомость?")) {
                 await db.collection('manifests').doc(id).delete();
             }
         }
@@ -384,12 +471,14 @@
                         let totalPlaces = 0;
                         let scannedPlaces = 0;
                         let lastScanDt = null;
+                        
+                        const isLoad = !data.docType || data.docType === 'load';
 
                         data.items.forEach(i => {
-                            totalPlaces += (i.totalPlaces || 1);
-                            scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
-                            
-                            // Находим время самого последнего скана
+                            if (i.status !== 'removed') {
+                                totalPlaces += (i.totalPlaces || 1);
+                                scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
+                            }
                             if (i.scannedAt) {
                                 let dt = new Date(i.scannedAt);
                                 if (!lastScanDt || dt > lastScanDt) lastScanDt = dt;
@@ -398,7 +487,6 @@
 
                         const isCompleted = totalPlaces > 0 && scannedPlaces === totalPlaces;
 
-                        // Расчет времени загрузки (если загружено)
                         let durationHtml = '';
                         if (isCompleted && data.createdAt && lastScanDt) {
                             let createdDt = typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(data.createdAt);
@@ -406,20 +494,38 @@
                             if (diffSecs >= 0) {
                                 let h = Math.floor(diffSecs / 3600);
                                 let m = Math.floor((diffSecs % 3600) / 60);
-                                durationHtml = `<div class="text-xs text-blue-700 mt-1 font-bold">⏱ Загружено за: ${h > 0 ? h + ' ч ' : ''}${m} мин</div>`;
+                                durationHtml = `<div class="text-xs text-gray-700 mt-2 font-bold bg-white bg-opacity-50 p-1 rounded inline-block">⏱ Время работы: ${h > 0 ? h + ' ч ' : ''}${m} мин</div>`;
                             }
                         }
 
-                        const color = isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400';
-                        const textColor = isCompleted ? 'text-green-700' : 'text-blue-800';
-                        const barColor = isCompleted ? 'bg-green-500' : 'bg-blue-500';
+                        // Цвета для ЗАГРУЗКИ и ВЫГРУЗКИ
+                        let colorClass, textColor, barColor, typeBadge;
+                        
+                        if (isLoad) {
+                            typeBadge = '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold">ЗАГРУЗКА</span>';
+                            colorClass = isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400';
+                            textColor = isCompleted ? 'text-green-700' : 'text-blue-800';
+                            barColor = isCompleted ? 'bg-green-500' : 'bg-blue-500';
+                        } else {
+                            typeBadge = '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold">ВЫГРУЗКА</span>';
+                            colorClass = isCompleted ? 'bg-orange-100 border-orange-500' : 'bg-white border-purple-400';
+                            textColor = isCompleted ? 'text-orange-700' : 'text-purple-800';
+                            barColor = isCompleted ? 'bg-orange-500' : 'bg-purple-500';
+                        }
+
                         const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
 
                         grid.innerHTML += `
-                            <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${color} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
-                                <button onclick="deleteManifest(event, '${doc.id}')" class="absolute top-2 right-2 text-gray-400 hover:text-red-600 bg-white bg-opacity-70 rounded p-1">✖</button>
-                                <div class="flex justify-between items-start mb-2 pr-8">
-                                    <h3 class="text-xl font-bold ${textColor}">${data.carNumber}</h3>
+                            <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${colorClass} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
+                                <div class="absolute top-2 right-2 flex gap-1">
+                                    <button onclick="editManifest(event, '${doc.id}')" class="text-gray-400 hover:text-blue-600 bg-white bg-opacity-70 rounded p-1" title="Редактировать">✏️</button>
+                                    <button onclick="deleteManifest(event, '${doc.id}')" class="text-gray-400 hover:text-red-600 bg-white bg-opacity-70 rounded p-1" title="Удалить">✖</button>
+                                </div>
+                                <div class="mb-2 pr-16">
+                                    ${typeBadge}
+                                </div>
+                                <div class="flex justify-between items-end mb-2 pr-16">
+                                    <h3 class="text-xl font-bold ${textColor} leading-none">${data.carNumber}</h3>
                                     <span class="text-sm font-bold ${textColor}">${scannedPlaces} / ${totalPlaces} мест</span>
                                 </div>
                                 <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
@@ -451,7 +557,20 @@
                 if(doc.exists) {
                     currentManifestDoc = doc.data(); 
                     const data = doc.data();
+                    const isLoad = !data.docType || data.docType === 'load';
                     
+                    const docTypeBadge = document.getElementById('scan-doc-type');
+                    const actionWord = document.getElementById('scan-action-word');
+                    if (isLoad) {
+                        docTypeBadge.innerText = 'ЗАГРУЗКА';
+                        docTypeBadge.className = 'ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold';
+                        actionWord.innerText = 'загружено';
+                    } else {
+                        docTypeBadge.innerText = 'ВЫГРУЗКА';
+                        docTypeBadge.className = 'ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold';
+                        actionWord.innerText = 'выгружено';
+                    }
+
                     let totalPlaces = 0;
                     let scannedPlaces = 0;
                     
@@ -459,15 +578,25 @@
                     listEl.innerHTML = '';
                     
                     data.items.forEach(item => {
+                        if (item.status === 'removed') return; // Не показываем полностью удаленные
+
                         const iTotal = item.totalPlaces || 1;
                         const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
                         
-                        totalPlaces += iTotal;
-                        scannedPlaces += iScanned;
+                        if (!item.isCancelled) {
+                            totalPlaces += iTotal;
+                            scannedPlaces += iScanned;
+                        }
                         
-                        let liClass, icon;
-                        if (iScanned === iTotal) {
-                            liClass = 'bg-green-100 text-green-800 opacity-70';
+                        let liClass, icon, specialBadge = '';
+                        
+                        if (item.isCancelled) {
+                            // ОФИС УДАЛИЛ, А ГРУЗ В МАШИНЕ - ТРЕБУЕТСЯ ВОЗВРАТ
+                            liClass = 'bg-red-100 text-red-900 border-red-500 border-2 animate-pulse';
+                            icon = '⚠️';
+                            specialBadge = `<span class="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">ОТМЕНА! Вернуть: ${iScanned} шт</span>`;
+                        } else if (iScanned === iTotal) {
+                            liClass = isLoad ? 'bg-green-100 text-green-800 opacity-70' : 'bg-orange-100 text-orange-800 opacity-70';
                             icon = '✓';
                         } else if (iScanned > 0 && iScanned < iTotal) {
                             liClass = 'bg-yellow-50 text-yellow-800 border-yellow-400 border-2';
@@ -478,7 +607,7 @@
                         }
                         
                         let timeHtml = '';
-                        if (item.scannedAt) {
+                        if (item.scannedAt && !item.isCancelled) {
                             const dt = new Date(item.scannedAt);
                             timeHtml = `<span class="text-xs text-blue-700 ml-2 font-bold">${dt.toLocaleTimeString('ru-RU')}</span>`;
                         }
@@ -488,10 +617,10 @@
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
                                         <span class="font-bold">${icon}</span>
-                                        <span class="font-bold text-sm md:text-base">${item.code}</span>
+                                        <span class="font-bold text-sm md:text-base ${item.isCancelled ? 'line-through' : ''}">${item.code}</span>
                                         ${timeHtml}
                                     </div>
-                                    <span class="text-xs font-bold bg-white px-2 py-1 rounded opacity-80">${iScanned}/${iTotal} палет</span>
+                                    ${item.isCancelled ? specialBadge : `<span class="text-xs font-bold bg-white px-2 py-1 rounded opacity-80 border">${iScanned}/${iTotal} палет</span>`}
                                 </div>
                                 <div class="text-[10px] md:text-xs text-gray-600 font-mono ml-5">
                                     Вес: ${item.brutto}/${item.netto} | Шт: ${item.pcs}
@@ -536,34 +665,56 @@
             const items = data.items;
             let alreadyScanned = false;
             let foundItem = null;
+            let isUndoMode = false;
 
             for (let i = 0; i < items.length; i++) {
                 if (items[i].code === cleanCode) {
-                    const iTotal = items[i].totalPlaces || 1;
-                    const iScanned = items[i].scannedPlaces !== undefined ? items[i].scannedPlaces : (items[i].status === 'scanned' ? iTotal : 0);
-
-                    if (iScanned < iTotal) {
-                        items[i].scannedPlaces = iScanned + 1;
+                    
+                    if (items[i].isCancelled && items[i].scannedPlaces > 0) {
+                        // ЛОГИКА ВОЗВРАТА (Отмены)
+                        items[i].scannedPlaces -= 1;
                         items[i].scannedBy = currentUser.email;
                         items[i].scannedAt = new Date().toISOString();
                         
-                        if (items[i].scannedPlaces === iTotal) {
-                            items[i].status = 'scanned'; 
-                        } else {
-                            items[i].status = 'partial';
+                        if (items[i].scannedPlaces === 0) {
+                            items[i].status = 'removed';
+                            items[i].isCancelled = false; // Возврат завершен
                         }
                         
                         foundItem = items[i];
+                        isUndoMode = true;
                         await docRef.update({ items: items });
-                        showSuccessFlash(foundItem);
+                        showSuccessFlash(foundItem, true);
                         return;
-                    } else {
-                        alreadyScanned = true;
+
+                    } else if (!items[i].isCancelled) {
+                        // ОБЫЧНАЯ ЛОГИКА СКАНИРОВАНИЯ
+                        const iTotal = items[i].totalPlaces || 1;
+                        const iScanned = items[i].scannedPlaces !== undefined ? items[i].scannedPlaces : (items[i].status === 'scanned' ? iTotal : 0);
+
+                        if (iScanned < iTotal) {
+                            items[i].scannedPlaces = iScanned + 1;
+                            items[i].scannedBy = currentUser.email;
+                            items[i].scannedAt = new Date().toISOString();
+                            
+                            if (items[i].scannedPlaces === iTotal) {
+                                items[i].status = 'scanned'; 
+                            } else {
+                                items[i].status = 'partial';
+                            }
+                            
+                            foundItem = items[i];
+                            await docRef.update({ items: items });
+                            showSuccessFlash(foundItem, false);
+                            return;
+                        } else {
+                            alreadyScanned = true;
+                        }
                     }
                 }
             }
 
-            const errorMsg = alreadyScanned ? `Номер ${cleanCode} УЖЕ ПОЛНОСТЬЮ ЗАГРУЖЕН!` : `Номер ${cleanCode} ЧУЖОЙ!`;
+            const errorMsg = alreadyScanned ? `Номер ${cleanCode} УЖЕ ОБРАБОТАН!` : `Номер ${cleanCode} ЧУЖОЙ!`;
             
             await docRef.update({
                 errors: firebase.firestore.FieldValue.arrayUnion({
@@ -577,23 +728,36 @@
             showErrorOverlay(errorMsg);
         }
 
-        function showSuccessFlash(item) {
+        function showSuccessFlash(item, isUndo) {
             playSuccessSound();
             const area = document.getElementById('scan-flash-area');
-            area.classList.remove('flash-green');
+            
+            // Если это возврат отмененного - мигаем оранжевым
+            area.className = `flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b md:border-b-0 md:border-r overflow-y-auto ${isUndo ? 'flash-orange' : 'flash-green'}`;
             void area.offsetWidth; 
-            area.classList.add('flash-green');
+            area.classList.add(isUndo ? 'flash-orange' : 'flash-green');
             
-            const isDone = item.scannedPlaces === (item.totalPlaces || 1);
-            const statusText = isDone ? 'ЗАГРУЖЕНО' : 'В ПРОЦЕССЕ';
-            
-            document.getElementById('scan-last-result').innerHTML = `
-                <div class="text-green-600 font-bold text-2xl md:text-3xl">✔ ${item.code}</div>
-                <div class="text-gray-800 font-bold text-xl mt-2 bg-yellow-200 inline-block px-4 py-1 rounded">
-                    ${item.scannedPlaces} из ${item.totalPlaces || 1} палет (${statusText})
-                </div>
-                <div class="text-gray-600 font-bold text-lg mt-2">Вес (B/N): ${item.brutto} / ${item.netto} кг</div>
-            `;
+            if (isUndo) {
+                document.getElementById('scan-last-result').innerHTML = `
+                    <div class="text-orange-600 font-bold text-2xl md:text-3xl">✔ ВОЗВРАТ: ${item.code}</div>
+                    <div class="text-gray-800 font-bold text-xl mt-2 bg-orange-200 inline-block px-4 py-1 rounded">
+                        Осталось вернуть: ${item.scannedPlaces} палет
+                    </div>
+                `;
+            } else {
+                const isDone = item.scannedPlaces === (item.totalPlaces || 1);
+                const statusText = isDone ? 'ГОТОВО' : 'В ПРОЦЕССЕ';
+                const isLoad = !currentManifestDoc.docType || currentManifestDoc.docType === 'load';
+                const actionColor = isLoad ? 'text-green-600' : 'text-purple-600';
+                
+                document.getElementById('scan-last-result').innerHTML = `
+                    <div class="${actionColor} font-bold text-2xl md:text-3xl">✔ ${item.code}</div>
+                    <div class="text-gray-800 font-bold text-xl mt-2 bg-yellow-200 inline-block px-4 py-1 rounded">
+                        ${item.scannedPlaces} из ${item.totalPlaces || 1} палет (${statusText})
+                    </div>
+                    <div class="text-gray-600 font-bold text-lg mt-2">Вес (B/N): ${item.brutto} / ${item.netto} кг</div>
+                `;
+            }
         }
 
         function showErrorOverlay(message) {
@@ -608,28 +772,29 @@
             document.getElementById('scanner-input').focus(); 
         }
 
-        // --- ПЕЧАТЬ PDF С РАСЧЕТОМ ВРЕМЕНИ ЗАГРУЗКИ ---
         function generatePDF() {
             if (!currentManifestDoc) return;
             const data = currentManifestDoc;
+            const isLoad = !data.docType || data.docType === 'load';
+            const actionVerb = isLoad ? "ЗАГРУЗКИ" : "ВЫГРУЗКИ";
+            const itemVerb = isLoad ? "Загружено" : "Выгружено";
             
             let totalPlaces = 0;
             let scannedPlaces = 0;
             let lastScanDt = null;
 
             data.items.forEach(i => {
+                if (i.status === 'removed') return;
+                
                 totalPlaces += (i.totalPlaces || 1);
                 scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
                 
-                if (i.scannedAt) {
+                if (i.scannedAt && !i.isCancelled) {
                     let dt = new Date(i.scannedAt);
                     if (!lastScanDt || dt > lastScanDt) lastScanDt = dt;
                 }
             });
             
-            const printDateStr = new Date().toLocaleString('ru-RU');
-            
-            // Расчет времени
             let createdDt = null;
             if (data.createdAt) {
                 createdDt = typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(data.createdAt);
@@ -654,7 +819,7 @@
 
             let html = `
                 <div style="text-align: center; margin-bottom: 20px;">
-                    <h1 style="font-size: 24px; font-family: sans-serif; margin-bottom: 5px;">АКТ ЗАГРУЗКИ Т/С</h1>
+                    <h1 style="font-size: 24px; font-family: sans-serif; margin-bottom: 5px;">АКТ ${actionVerb} Т/С</h1>
                     <p style="font-size: 18px; font-weight: bold; margin: 0;">Автомобиль: ${data.carNumber}</p>
                 </div>
                 
@@ -665,8 +830,8 @@
                         <p style="margin: 3px 0;"><strong>Последний скан:</strong> ${lastScanStr}</p>
                     </div>
                     <div style="text-align: right;">
-                        <p style="margin: 3px 0; font-size: 16px;"><strong>Время загрузки: <span style="color: #1d4ed8;">${durationStr}</span></strong></p>
-                        <p style="margin: 3px 0; font-size: 16px;"><strong>Итог:</strong> Загружено ${scannedPlaces} из ${totalPlaces} мест</p>
+                        <p style="margin: 3px 0; font-size: 16px;"><strong>Время обработки: <span style="color: #1d4ed8;">${durationStr}</span></strong></p>
+                        <p style="margin: 3px 0; font-size: 16px;"><strong>Итог:</strong> ${itemVerb} ${scannedPlaces} из ${totalPlaces} мест</p>
                     </div>
                 </div>
                 
@@ -675,25 +840,33 @@
                     <tbody>
             `;
 
-            data.items.forEach((item, index) => {
+            let idx = 1;
+            data.items.forEach((item) => {
+                if (item.status === 'removed') return; // Игнорируем полностью удаленные
+                
                 const iTotal = item.totalPlaces || 1;
                 const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
-                const statusTxt = iScanned === iTotal ? 'ЗАГРУЖЕНО' : (iScanned > 0 ? 'ЧАСТИЧНО' : 'ОЖИДАЕТ');
+                
+                let statusTxt = "";
+                if (item.isCancelled) statusTxt = "⚠️ ОШИБКА (ВЕРНУТЬ)";
+                else if (iScanned === iTotal) statusTxt = itemVerb.toUpperCase();
+                else if (iScanned > 0) statusTxt = "ЧАСТИЧНО";
+                else statusTxt = "ОЖИДАЕТ";
                 
                 let timeTxt = "-";
-                if (item.scannedAt) {
+                if (item.scannedAt && !item.isCancelled) {
                     const dt = new Date(item.scannedAt);
                     timeTxt = dt.toLocaleDateString('ru-RU') + " " + dt.toLocaleTimeString('ru-RU', { hour12: false });
                 }
 
                 html += `<tr>
-                    <td>${index + 1}</td>
-                    <td>${item.code}</td>
+                    <td>${idx++}</td>
+                    <td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${item.code}</td>
                     <td>${iScanned} из ${iTotal}</td>
                     <td>${item.brutto}</td>
                     <td>${item.netto}</td>
                     <td>${item.pcs}</td>
-                    <td>${statusTxt}</td>
+                    <td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${statusTxt}</td>
                     <td>${timeTxt}</td>
                 </tr>`;
             });
