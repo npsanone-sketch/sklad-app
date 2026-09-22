@@ -24,6 +24,16 @@
         .flash-orange { animation: flashOrange 1s ease-out; }
         .urgent-blink { animation: urgentBlink 1.5s infinite; border-width: 4px; }
         
+        /* Класс для полноэкранного режима списка */
+        .expanded-list {
+            position: absolute !important;
+            inset: 0 !important;
+            z-index: 40 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 100% !important;
+        }
+
         #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(239, 68, 68, 0.95); z-index: 50; justify-content: center; align-items: center; flex-direction: column; color: white; }
         #sound-unlock-overlay { display: none; position: absolute; inset: 0; background-color: rgba(30, 58, 138, 0.95); z-index: 40; justify-content: center; align-items: center; flex-direction: column; color: white; }
 
@@ -63,7 +73,11 @@
             <p id="user-info" class="text-sm text-blue-200"></p>
         </div>
         <div class="flex items-center gap-3">
-            <!-- КНОПКА ОНЛАЙН СТАТУСА -->
+            <!-- Кнопка Аналитики (Только Офис) -->
+            <button id="nav-analytics-btn" onclick="openAnalytics()" class="hidden text-xs md:text-sm bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded-full font-bold shadow transition flex items-center gap-1 border border-purple-400">
+                📊 Аналитика
+            </button>
+            
             <div class="relative">
                 <button onclick="togglePresenceModal()" class="text-xs md:text-sm bg-blue-900 hover:bg-blue-700 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-600 transition shadow">
                     <span class="animate-pulse">🟢</span> В сети: <span id="online-count-badge" class="font-bold">0</span>
@@ -94,7 +108,6 @@
     <div id="dashboard-screen" class="flex-1 overflow-auto p-4 hidden no-print relative">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h2 class="text-2xl font-bold text-gray-700" id="dashboard-title">Ведомости на день</h2>
-            
             <button id="create-btn" onclick="showCreateForm()" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow-md w-full sm:w-auto transition transform hover:scale-105">
                 + Создать ведомость
             </button>
@@ -102,11 +115,62 @@
         <div id="manifests-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
     </div>
 
+    <!-- ЭКРАН АНАЛИТИКИ (ДАШБОРД) -->
+    <div id="analytics-screen" class="hidden flex-1 overflow-auto p-4 md:p-6 bg-gray-50 no-print relative">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b pb-4">
+            <h2 class="text-2xl md:text-3xl font-bold text-gray-800">📊 Панель руководителя</h2>
+            <button onclick="closeAnalytics()" class="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-full font-bold shadow transition text-sm">← Вернуться к ведомостям</button>
+        </div>
+        
+        <!-- Выбор периода -->
+        <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+            <button onclick="setAnalyticsPeriod('today')" id="btn-period-today" class="px-5 py-2 rounded-full font-bold bg-blue-600 text-white shadow transition whitespace-nowrap">Сегодня</button>
+            <button onclick="setAnalyticsPeriod('yesterday')" id="btn-period-yesterday" class="px-5 py-2 rounded-full font-bold bg-white text-gray-700 border shadow-sm transition hover:bg-gray-100 whitespace-nowrap">Вчера</button>
+            <button onclick="setAnalyticsPeriod('week')" id="btn-period-week" class="px-5 py-2 rounded-full font-bold bg-white text-gray-700 border shadow-sm transition hover:bg-gray-100 whitespace-nowrap">7 дней</button>
+            <button onclick="setAnalyticsPeriod('month')" id="btn-period-month" class="px-5 py-2 rounded-full font-bold bg-white text-gray-700 border shadow-sm transition hover:bg-gray-100 whitespace-nowrap">30 дней</button>
+        </div>
+
+        <!-- 4 Главных показателя -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-5 rounded-xl shadow-md border-t-4 border-blue-500">
+                <h4 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Машины</h4>
+                <div class="text-4xl font-black mt-2 text-gray-800" id="stat-cars">0 / 0</div>
+                <div class="text-xs text-gray-400 mt-2 font-bold">Готово / В работе</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-md border-t-4 border-green-500">
+                <h4 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Паллеты</h4>
+                <div class="text-4xl font-black mt-2 text-gray-800" id="stat-pallets">0</div>
+                <div class="text-xs text-gray-400 mt-2 font-bold">Успешно отсканировано</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-md border-t-4 border-purple-500">
+                <h4 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Среднее время</h4>
+                <div class="text-4xl font-black mt-2 text-gray-800" id="stat-time">0 мин</div>
+                <div class="text-xs text-gray-400 mt-2 font-bold">На загрузку одной фуры</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-md border-t-4 border-red-500">
+                <h4 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Контроль качества</h4>
+                <div class="text-4xl font-black mt-2 text-red-600" id="stat-errors">0</div>
+                <div class="text-xs text-gray-500 mt-2 font-bold bg-red-50 inline-block px-2 py-1 rounded">Отмен офисом: <span id="stat-cancels">0</span></div>
+            </div>
+        </div>
+
+        <!-- Списки (Рейтинги) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
+            <div class="bg-white p-5 rounded-xl shadow-md">
+                <h4 class="font-bold text-gray-800 mb-4 border-b pb-3 text-lg flex items-center gap-2">🏆 Рейтинг (Паллеты)</h4>
+                <ul id="stat-top-users" class="space-y-3"></ul>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-md">
+                <h4 class="font-bold text-gray-800 mb-4 border-b pb-3 text-lg flex items-center gap-2">⚠️ Антирейтинг (Ошибки сканера)</h4>
+                <ul id="stat-top-errors" class="space-y-3"></ul>
+            </div>
+        </div>
+    </div>
+
     <!-- Форма создания / редактирования -->
     <div id="create-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center no-print p-4">
         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md md:max-w-xl">
             <h3 id="modal-title" class="text-xl font-bold mb-4">Новая ведомость</h3>
-            
             <div class="flex gap-4 mb-4">
                 <select id="new-manifest-type" class="w-1/2 border rounded p-2 font-bold text-sm bg-gray-50">
                     <option value="load">🟢 ЗАГРУЗКА АВТО</option>
@@ -114,12 +178,9 @@
                 </select>
                 <input type="text" id="new-car-number" placeholder="Номер авто (АА 1234)" class="w-1/2 border rounded p-2 font-bold text-lg">
             </div>
-            
             <label class="block text-sm font-medium mb-1">Скопируйте таблицу из Excel и вставьте сюда:</label>
             <textarea id="new-manifests-list" rows="6" oninput="updateManifestCount()" placeholder="Вставьте скопированные данные..." class="w-full border rounded p-2 mb-1 font-mono text-xs whitespace-pre"></textarea>
-            
             <div id="manifest-counter" class="text-green-600 font-bold mb-4 h-6">Распознано: 0 манифестов (0 палет)</div>
-
             <div class="flex justify-end gap-2">
                 <button onclick="hideCreateForm()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 font-bold">Отмена</button>
                 <button onclick="saveManifest()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold shadow-md">Сохранить</button>
@@ -162,14 +223,17 @@
                 <div id="scan-last-result" class="mt-6 text-center h-24 flex flex-col justify-center"></div>
             </div>
 
-            <div class="w-full md:w-1/3 lg:w-1/4 bg-gray-50 flex flex-col shrink-0 h-1/2 md:h-full relative">
-                <div class="bg-gray-200 p-2 text-center font-bold text-sm text-gray-700 shadow-sm z-10">План работы</div>
-                <div class="flex-1 overflow-y-auto p-2">
+            <!-- Обновленная зона списка с кнопкой Развернуть -->
+            <div id="scan-list-area" class="w-full md:w-1/2 lg:w-1/3 bg-gray-50 flex flex-col shrink-0 h-1/2 md:h-full relative transition-all duration-300">
+                <button id="toggle-list-btn" onclick="toggleListMode()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold p-3 text-center shadow-sm z-10 w-full border-b flex justify-center items-center gap-2 transition-colors text-sm">
+                    🔍 Развернуть список для сверки
+                </button>
+                <div class="flex-1 overflow-y-auto p-2 bg-white">
                     <ul id="manifest-items-list" class="space-y-2"></ul>
                 </div>
                 
-                <!-- ПЛАВАЮЩАЯ КНОПКА ЧАТА ДЛЯ СКЛАДА -->
-                <button onclick="openChatPanel()" class="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full h-14 w-14 flex items-center justify-center shadow-xl z-20 text-2xl transition transform hover:scale-110">
+                <!-- ПЛАВАЮЩАЯ КНОПКА ЧАТА -->
+                <button onclick="openChatPanel()" class="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full h-14 w-14 flex items-center justify-center shadow-xl z-20 text-2xl transition transform hover:scale-110 border-2 border-white">
                     💬
                     <span id="scan-chat-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 border-2 border-white flex items-center justify-center">!</span>
                 </button>
@@ -207,9 +271,6 @@
     <div id="print-area" class="hidden bg-white"></div>
 
     <script>
-        // =========================================================================
-        // НАСТРОЙКА ДОСТУПА (РОЛИ)
-        // =========================================================================
         const ADMIN_EMAILS = [
             'skypochka.v@novapost.pl',
             'mazuryk.o@novapost.pl',
@@ -224,8 +285,9 @@
         let currentDate = new Date();
         window.currentActivity = "Смотрит Главный экран";
 
-        // Глобальный счетчик сообщений для отслеживания ТОЛЬКО НОВЫХ
         let previousMessageCounts = {};
+        let currentAnalyticsPeriod = 'today';
+        let unsubscribeAnalytics = null;
 
         const firebaseConfig = {
           apiKey: "AIzaSyBUp11R-Sq46IrW9lwH5uFjXXzli5OASsU",
@@ -248,18 +310,14 @@
         let editingManifestId = null;
         let activeChatManifestId = null;
         
-        // --- ЗВУКОВАЯ СИСТЕМА ---
+        // --- АУДИО ---
         let audioCtx = null;
-
-        // Глобальная разблокировка звука по первому клику на экране
         document.addEventListener('click', () => {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
             }
-            if (audioCtx && audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
         }, { once: true });
         
         function unlockAudio() {
@@ -288,29 +346,17 @@
             const gain = audioCtx.createGain();
             osc.type = type;
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            
             gain.gain.setValueAtTime(vol, audioCtx.currentTime);
             gain.gain.setValueAtTime(vol, audioCtx.currentTime + duration - 0.05);
             gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
-            
             osc.connect(gain);
             gain.connect(audioCtx.destination);
             osc.start();
             osc.stop(audioCtx.currentTime + duration);
         }
 
-        function playSuccessSound() {
-            playTone(1200, 'square', 0.15, 1); 
-            setTimeout(() => playTone(1800, 'square', 0.25, 1), 200);
-        }
-
-        function playErrorSound() {
-            for (let i = 0; i < 6; i++) {
-                setTimeout(() => playTone(1000, 'sawtooth', 0.25, 1), i * 500);
-                setTimeout(() => playTone(700, 'sawtooth', 0.25, 1), i * 500 + 250);
-            }
-        }
-
+        function playSuccessSound() { playTone(1200, 'square', 0.15, 1); setTimeout(() => playTone(1800, 'square', 0.25, 1), 200); }
+        function playErrorSound() { for (let i = 0; i < 6; i++) { setTimeout(() => playTone(1000, 'sawtooth', 0.25, 1), i * 500); setTimeout(() => playTone(700, 'sawtooth', 0.25, 1), i * 500 + 250); } }
         function playBloop() {
             if(!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -327,22 +373,17 @@
                 osc.start(startTime);
                 osc.stop(startTime + 0.15);
             };
-            // Приятный "Бульк"
-            play(500, audioCtx.currentTime);
-            play(700, audioCtx.currentTime + 0.15);
+            play(500, audioCtx.currentTime); play(700, audioCtx.currentTime + 0.15);
         }
 
-        // --- СИСТЕМА ОНЛАЙН СТАТУСОВ (PRESENCE) ---
+        // --- PRESENCE ---
         let presenceInterval = null;
-
         async function updatePresence() {
             if(!currentUser) return;
             try {
                 await db.collection('presence').doc(currentUser.email).set({
-                    email: currentUser.email,
-                    role: isAdmin ? 'Офис' : 'Склад',
-                    activity: window.currentActivity,
-                    lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                    email: currentUser.email, role: isAdmin ? 'Офис' : 'Склад',
+                    activity: window.currentActivity, lastActive: firebase.firestore.FieldValue.serverTimestamp()
                 }, {merge: true});
             } catch(e) {}
         }
@@ -353,26 +394,18 @@
             presenceInterval = setInterval(updatePresence, 60000); 
 
             db.collection('presence').onSnapshot(snap => {
-                let onlineCount = 0;
-                let html = '';
-                const now = new Date();
+                let onlineCount = 0; let html = ''; const now = new Date();
                 snap.forEach(doc => {
                     const d = doc.data();
                     if(!d.lastActive) return;
-                    
                     let diff = (now - d.lastActive.toDate()) / 1000;
                     if (diff < 0) diff = 0; 
-                    
-                    if(diff < 300) { // Активность за последние 5 минут
+                    if(diff < 300) {
                         onlineCount++;
                         const roleColor = d.role === 'Офис' ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-800';
                         html += `
                             <div class="border-b py-2 last:border-0">
-                                <div class="flex items-center gap-1 text-sm">
-                                    <span class="text-green-500 text-xs">🟢</span> 
-                                    <span class="font-bold truncate">${d.email.split('@')[0]}</span>
-                                    <span class="text-[10px] px-1 rounded font-bold ${roleColor}">${d.role}</span>
-                                </div>
+                                <div class="flex items-center gap-1 text-sm"><span class="text-green-500 text-xs">🟢</span> <span class="font-bold truncate">${d.email.split('@')[0]}</span><span class="text-[10px] px-1 rounded font-bold ${roleColor}">${d.role}</span></div>
                                 <div class="text-xs text-gray-500 ml-4 truncate" title="${d.activity}">${d.activity}</div>
                             </div>`;
                     }
@@ -382,15 +415,8 @@
             });
         }
 
-        function togglePresenceModal() {
-            const el = document.getElementById('presence-modal');
-            el.classList.toggle('hidden');
-        }
-
-        window.addEventListener('beforeunload', () => {
-            if(currentUser) db.collection('presence').doc(currentUser.email).delete();
-        });
-
+        function togglePresenceModal() { document.getElementById('presence-modal').classList.toggle('hidden'); }
+        window.addEventListener('beforeunload', () => { if(currentUser) db.collection('presence').doc(currentUser.email).delete(); });
 
         // --- КАЛЕНДАРЬ ---
         function updateDateDisplay() {
@@ -406,20 +432,139 @@
             document.getElementById('date-picker').value = currentDate.toISOString().split('T')[0];
         }
 
-        function changeDate(offset) {
-            currentDate.setDate(currentDate.getDate() + offset);
-            updateDateDisplay();
-            loadDashboard();
+        function changeDate(offset) { currentDate.setDate(currentDate.getDate() + offset); updateDateDisplay(); loadDashboard(); }
+        function setDateFromPicker(val) { if (!val) return; currentDate = new Date(val); updateDateDisplay(); loadDashboard(); }
+
+        // --- АНАЛИТИКА ---
+        function openAnalytics() {
+            document.getElementById('dashboard-screen').classList.add('hidden');
+            document.getElementById('date-ribbon').classList.add('hidden');
+            document.getElementById('scan-screen').classList.add('hidden');
+            document.getElementById('analytics-screen').classList.remove('hidden');
+            window.currentActivity = "Смотрит Аналитику";
+            updatePresence();
+            loadAnalyticsData();
         }
 
-        function setDateFromPicker(val) {
-            if (!val) return;
-            currentDate = new Date(val);
-            updateDateDisplay();
-            loadDashboard();
+        function closeAnalytics() {
+            if(unsubscribeAnalytics) { unsubscribeAnalytics(); unsubscribeAnalytics = null; }
+            document.getElementById('analytics-screen').classList.add('hidden');
+            document.getElementById('dashboard-screen').classList.remove('hidden');
+            document.getElementById('date-ribbon').classList.remove('hidden');
+            window.currentActivity = "Смотрит Главный экран";
+            updatePresence();
         }
 
-        // --- АВТОРИЗАЦИЯ И РОЛИ ---
+        function setAnalyticsPeriod(period) {
+            currentAnalyticsPeriod = period;
+            ['today', 'yesterday', 'week', 'month'].forEach(p => {
+                const btn = document.getElementById('btn-period-' + p);
+                if(p === period) btn.className = "px-5 py-2 rounded-full font-bold bg-blue-600 text-white shadow transition whitespace-nowrap";
+                else btn.className = "px-5 py-2 rounded-full font-bold bg-white text-gray-700 border shadow-sm transition hover:bg-gray-100 whitespace-nowrap";
+            });
+            loadAnalyticsData();
+        }
+
+        function loadAnalyticsData() {
+            if(unsubscribeAnalytics) unsubscribeAnalytics();
+
+            let startDate = new Date();
+            startDate.setHours(0,0,0,0);
+            let endDate = new Date();
+            endDate.setHours(23,59,59,999);
+
+            if (currentAnalyticsPeriod === 'yesterday') {
+                startDate.setDate(startDate.getDate() - 1);
+                endDate.setDate(endDate.getDate() - 1);
+            } else if (currentAnalyticsPeriod === 'week') {
+                startDate.setDate(startDate.getDate() - 7);
+            } else if (currentAnalyticsPeriod === 'month') {
+                startDate.setDate(startDate.getDate() - 30);
+            }
+
+            unsubscribeAnalytics = db.collection('manifests').orderBy('createdAt', 'desc').onSnapshot(snap => {
+                let carsTotal = 0, carsDone = 0;
+                let palletsScanned = 0;
+                let durations = [];
+                let userScans = {};
+                let userErrors = {};
+                let cancels = 0;
+                let errorsCount = 0;
+
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    let dt = data.createdAt ? data.createdAt.toDate() : new Date();
+                    if (dt < startDate || dt > endDate) return;
+
+                    carsTotal++;
+                    let cPlaces = 0, cScanned = 0;
+                    let lastScanTime = null;
+
+                    data.items.forEach(i => {
+                        if (i.status === 'removed') return;
+                        let t = i.totalPlaces || 1;
+                        let s = i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? t : 0);
+                        
+                        cPlaces += t;
+                        if (!i.isCancelled) {
+                            cScanned += s;
+                            palletsScanned += s;
+                            if (s > 0 && i.scannedBy) userScans[i.scannedBy] = (userScans[i.scannedBy] || 0) + s;
+                        } else {
+                            if (s > 0) cancels++;
+                        }
+
+                        if (i.scannedAt && !i.isCancelled) {
+                            let scanDt = new Date(i.scannedAt);
+                            if (!lastScanTime || scanDt > lastScanTime) lastScanTime = scanDt;
+                        }
+                    });
+
+                    if (cPlaces > 0 && cScanned === cPlaces) {
+                        carsDone++;
+                        if (lastScanTime) durations.push((lastScanTime - dt) / 1000 / 60); 
+                    }
+
+                    if (data.errors) {
+                        errorsCount += data.errors.length;
+                        data.errors.forEach(e => {
+                            if (e.scannedBy) userErrors[e.scannedBy] = (userErrors[e.scannedBy] || 0) + 1;
+                        });
+                    }
+                });
+
+                document.getElementById('stat-cars').innerText = `${carsDone} / ${carsTotal}`;
+                document.getElementById('stat-pallets').innerText = palletsScanned;
+                document.getElementById('stat-errors').innerText = errorsCount;
+                document.getElementById('stat-cancels').innerText = cancels;
+                
+                if (durations.length > 0) {
+                    let avg = durations.reduce((a,b)=>a+b,0) / durations.length;
+                    document.getElementById('stat-time').innerText = Math.round(avg) + ' мин';
+                } else {
+                    document.getElementById('stat-time').innerText = '0 мин';
+                }
+
+                // Рендер ТОП
+                const scanArr = Object.entries(userScans).sort((a,b)=>b[1]-a[1]);
+                let scanHtml = '';
+                scanArr.forEach((u, idx) => {
+                    let medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '👤'));
+                    scanHtml += `<li class="flex justify-between items-center p-3 bg-gray-50 rounded border"><span class="font-bold text-gray-700">${medal} ${u[0].split('@')[0]}</span><span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-bold text-sm shadow-sm">${u[1]} шт</span></li>`;
+                });
+                document.getElementById('stat-top-users').innerHTML = scanHtml || '<li class="text-sm text-gray-500">Нет данных за этот период</li>';
+
+                const errArr = Object.entries(userErrors).sort((a,b)=>b[1]-a[1]);
+                let errHtml = '';
+                errArr.forEach(u => {
+                    errHtml += `<li class="flex justify-between items-center p-3 bg-gray-50 rounded border"><span class="font-bold text-gray-700">🚩 ${u[0].split('@')[0]}</span><span class="bg-red-100 text-red-800 px-3 py-1 rounded-full font-bold text-sm shadow-sm">${u[1]} ошибок</span></li>`;
+                });
+                document.getElementById('stat-top-errors').innerHTML = errHtml || '<li class="text-sm text-gray-500">Ошибок нет, идеальная работа!</li>';
+            });
+        }
+
+
+        // --- АВТОРИЗАЦИЯ ---
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
@@ -434,9 +579,11 @@
                 
                 if (isAdmin) {
                     document.getElementById('create-btn').classList.remove('hidden');
+                    document.getElementById('nav-analytics-btn').classList.remove('hidden');
                     document.getElementById('chat-quick-replies').classList.add('hidden'); 
                 } else {
                     document.getElementById('create-btn').classList.add('hidden');
+                    document.getElementById('nav-analytics-btn').classList.add('hidden');
                     document.getElementById('chat-quick-replies').classList.remove('hidden'); 
                 }
 
@@ -454,20 +601,13 @@
         });
 
         function login() {
-            // Пытаемся разблокировать звук при клике на кнопку логина
-            if (!audioCtx) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioCtx = new AudioContext();
-            }
+            if (!audioCtx) { const AudioContext = window.AudioContext || window.webkitAudioContext; audioCtx = new AudioContext(); }
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const e = document.getElementById('email').value.trim();
             const p = document.getElementById('password').value.trim();
             const err = document.getElementById('login-error');
-            auth.signInWithEmailAndPassword(e, p).catch(error => {
-                err.innerText = "Ошибка входа!";
-                err.classList.remove('hidden');
-            });
+            auth.signInWithEmailAndPassword(e, p).catch(error => { err.innerText = "Ошибка входа!"; err.classList.remove('hidden'); });
         }
 
         function logout() { 
@@ -480,77 +620,40 @@
             const lines = text.split('\n');
             const items = [];
             const seen = new Set();
-
             lines.forEach(line => {
                 line = line.trim();
                 if(!line) return;
-
-                let code = "";
-                let brutto = "-", netto = "-", pcs = "-", totalPlaces = 1;
-
+                let code = "", brutto = "-", netto = "-", pcs = "-", totalPlaces = 1;
                 if (line.includes('\t')) {
                     const cols = line.split('\t').map(c => c.trim());
                     let codeCol = "";
-                    for (let i = 0; i < Math.min(3, cols.length); i++) {
-                        if (cols[i].length > codeCol.length) codeCol = cols[i];
-                    }
+                    for (let i = 0; i < Math.min(3, cols.length); i++) { if (cols[i].length > codeCol.length) codeCol = cols[i]; }
                     if (codeCol.includes('/')) codeCol = codeCol.split('/')[0];
                     code = codeCol.trim().toUpperCase();
                     if (/^[A-Z]{2}MF/.test(code)) code = code.substring(2);
-
                     let paletaIdx = cols.findIndex(c => c.toLowerCase().includes('paleta'));
-                    if (paletaIdx > 0) {
-                        totalPlaces = parseInt(cols[paletaIdx - 1], 10) || 1;
-                    } else {
-                        let numCol = cols.find((c, idx) => idx > 0 && c.length > 0 && !isNaN(parseInt(c, 10)));
-                        if (numCol) totalPlaces = parseInt(numCol, 10) || 1;
-                    }
-
-                    if (paletaIdx >= 0 && paletaIdx + 4 < cols.length) {
-                        brutto = cols[paletaIdx + 1] || "-";
-                        netto = cols[paletaIdx + 2] || "-";
-                        pcs = cols[paletaIdx + 4] || "-";
-                    } else if (cols.length >= 6) {
-                        brutto = cols[cols.length - 4] || "-";
-                        netto = cols[cols.length - 3] || "-";
-                        pcs = cols[cols.length - 1] || "-";
-                    }
+                    if (paletaIdx > 0) { totalPlaces = parseInt(cols[paletaIdx - 1], 10) || 1; } 
+                    else { let numCol = cols.find((c, idx) => idx > 0 && c.length > 0 && !isNaN(parseInt(c, 10))); if (numCol) totalPlaces = parseInt(numCol, 10) || 1; }
+                    if (paletaIdx >= 0 && paletaIdx + 4 < cols.length) { brutto = cols[paletaIdx + 1] || "-"; netto = cols[paletaIdx + 2] || "-"; pcs = cols[paletaIdx + 4] || "-"; } 
+                    else if (cols.length >= 6) { brutto = cols[cols.length - 4] || "-"; netto = cols[cols.length - 3] || "-"; pcs = cols[cols.length - 1] || "-"; }
                 } else {
                     const paletaMatch = line.match(/(.*?)(\d+)\s*paleta(.*)/i);
                     if (paletaMatch) {
-                        let pre = paletaMatch[1].trim();
-                        totalPlaces = parseInt(paletaMatch[2], 10) || 1;
+                        let pre = paletaMatch[1].trim(); totalPlaces = parseInt(paletaMatch[2], 10) || 1;
                         if (pre.includes('/')) pre = pre.split('/')[0];
-                        const words = pre.split(/\s+/);
-                        code = words.reduce((long, cur) => cur.length > long.length ? cur : long, "").toUpperCase();
+                        code = pre.split(/\s+/).reduce((long, cur) => cur.length > long.length ? cur : long, "").toUpperCase();
                         if (/^[A-Z]{2}MF/.test(code)) code = code.substring(2);
                     } else {
-                        let pre = line;
-                        if (pre.includes('/')) pre = pre.split('/')[0];
-                        const words = pre.split(/\s+/);
-                        code = words.reduce((long, cur) => cur.length > long.length ? cur : long, "").toUpperCase();
+                        let pre = line; if (pre.includes('/')) pre = pre.split('/')[0];
+                        code = pre.split(/\s+/).reduce((long, cur) => cur.length > long.length ? cur : long, "").toUpperCase();
                         if (/^[A-Z]{2}MF/.test(code)) code = code.substring(2);
                     }
                 }
-
                 if (!code || code.length < 4) return;
                 if (seen.has(code)) return;
                 seen.add(code);
-
-                items.push({
-                    code: code,
-                    status: 'pending',
-                    isCancelled: false,
-                    totalPlaces: totalPlaces,
-                    scannedPlaces: 0,
-                    scannedBy: null,
-                    scannedAt: null,
-                    brutto: brutto,
-                    netto: netto,
-                    pcs: pcs
-                });
+                items.push({ code: code, status: 'pending', isCancelled: false, totalPlaces: totalPlaces, scannedPlaces: 0, scannedBy: null, scannedAt: null, brutto: brutto, netto: netto, pcs: pcs });
             });
-
             return items;
         }
 
@@ -568,7 +671,6 @@
             }
         }
 
-        // --- СОЗДАНИЕ И РЕДАКТИРОВАНИЕ ---
         function showCreateForm() {
             editingManifestId = null;
             document.getElementById('modal-title').innerText = 'Новая ведомость';
@@ -583,23 +685,15 @@
         async function editManifest(event, id) {
             event.stopPropagation();
             if (!isAdmin) return;
-
             const docSnap = await db.collection('manifests').doc(id).get();
             if (!docSnap.exists) return;
-            
             const data = docSnap.data();
             editingManifestId = id;
-            
             document.getElementById('modal-title').innerText = 'Редактирование ведомости';
             document.getElementById('new-car-number').value = data.carNumber;
             document.getElementById('new-manifest-type').value = data.docType || 'load';
             document.getElementById('new-manifest-type').disabled = true; 
-            
-            const text = data.items
-                .filter(i => i.status !== 'removed')
-                .map(i => `${i.code}\t\t${i.totalPlaces} paleta\t\t${i.brutto}\t${i.netto}\t\t${i.pcs}`)
-                .join('\n');
-                
+            const text = data.items.filter(i => i.status !== 'removed').map(i => `${i.code}\t\t${i.totalPlaces} paleta\t\t${i.brutto}\t${i.netto}\t\t${i.pcs}`).join('\n');
             document.getElementById('new-manifests-list').value = text;
             document.getElementById('create-modal').classList.remove('hidden');
             updateManifestCount();
@@ -612,266 +706,165 @@
             const docType = document.getElementById('new-manifest-type').value;
             const text = document.getElementById('new-manifests-list').value;
             const newItemsParsed = parseExcelData(text);
-
             if (!car) return alert("Введите номер автомобиля!");
             if (newItemsParsed.length === 0) return alert("Не удалось распознать номера!");
-            
             try {
                 if (editingManifestId) {
                     const docRef = db.collection('manifests').doc(editingManifestId);
                     const docSnap = await docRef.get();
                     const data = docSnap.data();
                     const oldItems = data.items;
-                    let mergedItems = [];
-                    
-                    let addedLog = [];
-                    let removedLog = [];
-                    let changedLog = [];
-
+                    let mergedItems = []; let addedLog = []; let removedLog = []; let changedLog = [];
                     oldItems.forEach(oldItem => {
                         const foundInNew = newItemsParsed.find(n => n.code === oldItem.code);
                         if (foundInNew) {
-                            if (oldItem.totalPlaces !== foundInNew.totalPlaces) {
-                                changedLog.push(`${oldItem.code} (${oldItem.totalPlaces} ➡️ ${foundInNew.totalPlaces} шт)`);
-                            }
-                            oldItem.totalPlaces = foundInNew.totalPlaces;
-                            oldItem.brutto = foundInNew.brutto;
-                            oldItem.netto = foundInNew.netto;
-                            oldItem.pcs = foundInNew.pcs;
-                            oldItem.isCancelled = false;
-                            
-                            if (oldItem.status === 'removed') {
-                                oldItem.status = oldItem.scannedPlaces >= oldItem.totalPlaces ? 'scanned' : (oldItem.scannedPlaces > 0 ? 'partial' : 'pending');
-                            }
+                            if (oldItem.totalPlaces !== foundInNew.totalPlaces) changedLog.push(`${oldItem.code} (${oldItem.totalPlaces} ➡️ ${foundInNew.totalPlaces} шт)`);
+                            oldItem.totalPlaces = foundInNew.totalPlaces; oldItem.brutto = foundInNew.brutto; oldItem.netto = foundInNew.netto; oldItem.pcs = foundInNew.pcs; oldItem.isCancelled = false;
+                            if (oldItem.status === 'removed') oldItem.status = oldItem.scannedPlaces >= oldItem.totalPlaces ? 'scanned' : (oldItem.scannedPlaces > 0 ? 'partial' : 'pending');
                             mergedItems.push(oldItem);
                         } else {
                             removedLog.push(oldItem.code);
-                            if (oldItem.scannedPlaces > 0 && oldItem.status !== 'removed') {
-                                oldItem.isCancelled = true;
-                                mergedItems.push(oldItem);
-                            } 
+                            if (oldItem.scannedPlaces > 0 && oldItem.status !== 'removed') { oldItem.isCancelled = true; mergedItems.push(oldItem); } 
                         }
                     });
-
                     newItemsParsed.forEach(newItem => {
                         const foundInOld = oldItems.find(o => o.code === newItem.code);
-                        if (!foundInOld) {
-                            addedLog.push(newItem.code);
-                            mergedItems.push(newItem);
-                        }
+                        if (!foundInOld) { addedLog.push(newItem.code); mergedItems.push(newItem); }
                     });
-
                     const editHistory = data.editHistory || [];
                     let isModifiedFlag = data.modified || false;
-
                     if (addedLog.length > 0 || removedLog.length > 0 || changedLog.length > 0) {
-                        editHistory.push({
-                            editedAt: new Date().toISOString(),
-                            editedBy: currentUser.email,
-                            added: addedLog,
-                            removed: removedLog,
-                            changed: changedLog
-                        });
+                        editHistory.push({ editedAt: new Date().toISOString(), editedBy: currentUser.email, added: addedLog, removed: removedLog, changed: changedLog });
                         isModifiedFlag = true;
                     }
-
-                    await docRef.update({ 
-                        carNumber: car,
-                        items: mergedItems,
-                        editHistory: editHistory,
-                        modified: isModifiedFlag
-                    });
+                    await docRef.update({ carNumber: car, items: mergedItems, editHistory: editHistory, modified: isModifiedFlag });
                 } else {
                     await db.collection('manifests').add({
-                        carNumber: car,
-                        docType: docType,
-                        creatorEmail: currentUser.email,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        items: newItemsParsed,
-                        errors: [],
-                        editHistory: [],
-                        messages: [], // Для чата
-                        unreadByOffice: false,
-                        unreadByWarehouse: false,
-                        modified: false,
-                        status: 'pending'
+                        carNumber: car, docType: docType, creatorEmail: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        items: newItemsParsed, errors: [], editHistory: [], messages: [], readBy: [currentUser.email], modified: false, status: 'pending'
                     });
                 }
                 hideCreateForm();
-            } catch (err) {
-                alert("Ошибка сохранения: " + err.message);
-            }
+            } catch (err) { alert("Ошибка сохранения: " + err.message); }
         }
 
         async function deleteManifest(event, id) {
             event.stopPropagation();
             if (!isAdmin) return;
-            if (confirm("Полностью удалить ведомость?")) {
-                await db.collection('manifests').doc(id).delete();
-            }
+            if (confirm("Полностью удалить ведомость?")) await db.collection('manifests').doc(id).delete();
         }
 
-        // --- ДАШБОРД ---
+        // --- ДАШБОРД (ГЛАВНЫЙ ЭКРАН) ---
         function loadDashboard() {
             window.currentActivity = "Смотрит Главный экран";
             updatePresence();
-
             if (unsubscribeManifests) unsubscribeManifests();
-            
-            const startOfDay = new Date(currentDate);
-            startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(currentDate);
-            endOfDay.setHours(23, 59, 59, 999);
+            const startOfDay = new Date(currentDate); startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(currentDate); endOfDay.setHours(23, 59, 59, 999);
 
-            unsubscribeManifests = db.collection('manifests')
-                .orderBy('createdAt', 'desc')
-                .onSnapshot(snapshot => {
-                    // ФИКСАЦИЯ НОВЫХ СООБЩЕНИЙ ДЛЯ ЗВУКА "БУЛЬК"
-                    let isInitialLoad = Object.keys(previousMessageCounts).length === 0;
-
-                    snapshot.docChanges().forEach(change => {
-                        const data = change.doc.data();
-                        const msgCount = data.messages ? data.messages.length : 0;
-                        
-                        if (change.type === 'added' || change.type === 'modified') {
-                            const prevCount = previousMessageCounts[change.doc.id] || 0;
-                            if (!isInitialLoad && msgCount > prevCount) {
-                                const lastMsg = data.messages[msgCount - 1];
-                                // Если сообщение прислал КТО-ТО ДРУГОЙ, делаем Бульк
-                                if (lastMsg && lastMsg.sender !== currentUser.email) {
-                                    playBloop();
-                                }
-                            }
-                            previousMessageCounts[change.doc.id] = msgCount;
+            unsubscribeManifests = db.collection('manifests').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+                let isInitialLoad = Object.keys(previousMessageCounts).length === 0;
+                snapshot.docChanges().forEach(change => {
+                    const data = change.doc.data();
+                    const msgCount = data.messages ? data.messages.length : 0;
+                    if (change.type === 'added' || change.type === 'modified') {
+                        const prevCount = previousMessageCounts[change.doc.id] || 0;
+                        if (!isInitialLoad && msgCount > prevCount) {
+                            const lastMsg = data.messages[msgCount - 1];
+                            if (lastMsg && lastMsg.sender !== currentUser.email) playBloop();
                         }
-                        if (change.type === 'removed') {
-                            delete previousMessageCounts[change.doc.id];
-                        }
-                    });
-
-
-                    const grid = document.getElementById('manifests-grid');
-                    grid.innerHTML = '';
-                    let itemsShown = 0;
-                    
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        
-                        let docDate = data.createdAt ? data.createdAt.toDate() : new Date();
-                        if (docDate < startOfDay || docDate > endOfDay) return; 
-                        
-                        itemsShown++;
-
-                        let totalPlaces = 0;
-                        let scannedPlaces = 0;
-                        let lastScanDt = null;
-                        
-                        let needsReturn = false;
-                        let returnList = [];
-                        
-                        const isLoad = !data.docType || data.docType === 'load';
-
-                        data.items.forEach(i => {
-                            if (i.isCancelled && i.scannedPlaces > 0) {
-                                needsReturn = true;
-                                returnList.push(`${i.code} (${i.scannedPlaces} шт)`);
-                            }
-
-                            if (i.status !== 'removed') {
-                                totalPlaces += (i.totalPlaces || 1);
-                                scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
-                            }
-                            if (i.scannedAt && !i.isCancelled) {
-                                let dt = new Date(i.scannedAt);
-                                if (!lastScanDt || dt > lastScanDt) lastScanDt = dt;
-                            }
-                        });
-
-                        const isCompleted = totalPlaces > 0 && scannedPlaces === totalPlaces;
-
-                        let durationHtml = '';
-                        if (isCompleted && data.createdAt && lastScanDt && !needsReturn) {
-                            let diffSecs = Math.floor((lastScanDt - docDate) / 1000);
-                            if (diffSecs >= 0) {
-                                let h = Math.floor(diffSecs / 3600);
-                                let m = Math.floor((diffSecs % 3600) / 60);
-                                durationHtml = `<div class="text-xs text-gray-700 mt-2 font-bold bg-white bg-opacity-50 p-1 rounded inline-block">⏱ Время: ${h > 0 ? h + ' ч ' : ''}${m} мин</div>`;
-                            }
-                        }
-
-                        let typeBadge = isLoad 
-                            ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold shadow-sm">ЗАГРУЗКА</span>'
-                            : '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold shadow-sm">ВЫГРУЗКА</span>';
-
-                        if (data.modified && !isCompleted && !needsReturn) {
-                            typeBadge += ' <span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded font-bold ml-1 shadow-sm">⚠️ ИЗМЕНЕНА</span>';
-                        }
-
-                        let cardClass = isLoad 
-                            ? (isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400')
-                            : (isCompleted ? 'bg-orange-100 border-orange-500' : 'bg-white border-purple-400');
-                        
-                        if (data.modified && !isCompleted && !needsReturn) {
-                            cardClass = 'bg-yellow-50 border-yellow-400';
-                        }
-                        
-                        let textColor = isLoad ? (isCompleted ? 'text-green-700' : 'text-blue-800') : (isCompleted ? 'text-orange-700' : 'text-purple-800');
-                        let barColor = isLoad ? (isCompleted ? 'bg-green-500' : 'bg-blue-500') : (isCompleted ? 'bg-orange-500' : 'bg-purple-500');
-
-                        let returnAlertHtml = '';
-                        if (needsReturn) {
-                            cardClass = 'urgent-blink';
-                            textColor = 'text-red-900';
-                            returnAlertHtml = `
-                                <div class="mt-3 bg-red-600 text-white p-2 rounded shadow-inner border border-red-800">
-                                    <div class="text-sm font-bold mb-1">⚠️ ИЗМЕНЕНИЕ! ВЕРНУТЬ:</div>
-                                    <div class="font-mono text-xs leading-tight">${returnList.join(', ')}</div>
-                                </div>
-                            `;
-                        }
-
-                        const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
-                        
-                        // Индикатор Чата на Дашборде
-                        const hasUnread = isAdmin ? data.unreadByOffice : data.unreadByWarehouse;
-                        const chatBadge = hasUnread ? `<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>` : '';
-
-                        let actionButtons = `
-                            <div class="absolute top-2 right-2 flex gap-1 z-10">
-                                <button onclick="openChatPanel(event, '${doc.id}', '${data.carNumber}')" class="relative text-blue-600 bg-blue-50 hover:bg-blue-100 rounded p-1 shadow-sm border border-blue-200 transition ${hasUnread ? 'animate-bounce' : ''}" title="Чат">💬${chatBadge}</button>
-                        `;
-                        if (isAdmin) {
-                            actionButtons += `
-                                <button onclick="editManifest(event, '${doc.id}')" class="text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Редактировать">✏️</button>
-                                <button onclick="deleteManifest(event, '${doc.id}')" class="text-gray-600 hover:text-red-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Удалить">✖</button>
-                            `;
-                        }
-                        actionButtons += `</div>`;
-
-                        grid.innerHTML += `
-                            <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${cardClass} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
-                                ${actionButtons}
-                                <div class="mb-3 pr-24">
-                                    ${typeBadge}
-                                </div>
-                                <div class="flex justify-between items-end mb-2 pr-24">
-                                    <h3 class="text-xl font-bold ${textColor} leading-none">${data.carNumber}</h3>
-                                    <span class="text-sm font-bold ${textColor}">${scannedPlaces} / ${totalPlaces} мест</span>
-                                </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                                    <div class="${barColor} h-2.5 rounded-full" style="width: ${percent}%"></div>
-                                </div>
-                                <div class="text-xs text-gray-500 mt-2">Создал: ${data.creatorEmail}</div>
-                                ${durationHtml}
-                                ${returnAlertHtml}
-                            </div>
-                        `;
-                    });
-
-                    if (itemsShown === 0) {
-                        grid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10 font-bold">За выбранную дату (${currentDate.toLocaleDateString('ru-RU')}) машин нет.</div>`;
+                        previousMessageCounts[change.doc.id] = msgCount;
                     }
+                    if (change.type === 'removed') delete previousMessageCounts[change.doc.id];
                 });
+
+                const grid = document.getElementById('manifests-grid');
+                grid.innerHTML = ''; let itemsShown = 0;
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    let docDate = data.createdAt ? data.createdAt.toDate() : new Date();
+                    if (docDate < startOfDay || docDate > endOfDay) return; 
+                    
+                    itemsShown++;
+                    let totalPlaces = 0, scannedPlaces = 0, lastScanDt = null, needsReturn = false, returnList = [];
+                    const isLoad = !data.docType || data.docType === 'load';
+
+                    data.items.forEach(i => {
+                        if (i.isCancelled && i.scannedPlaces > 0) { needsReturn = true; returnList.push(`${i.code} (${i.scannedPlaces} шт)`); }
+                        if (i.status !== 'removed') {
+                            totalPlaces += (i.totalPlaces || 1);
+                            scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
+                        }
+                        if (i.scannedAt && !i.isCancelled) { let dt = new Date(i.scannedAt); if (!lastScanDt || dt > lastScanDt) lastScanDt = dt; }
+                    });
+
+                    const isCompleted = totalPlaces > 0 && scannedPlaces === totalPlaces;
+                    let durationHtml = '';
+                    if (isCompleted && data.createdAt && lastScanDt && !needsReturn) {
+                        let diffSecs = Math.floor((lastScanDt - docDate) / 1000);
+                        if (diffSecs >= 0) {
+                            let h = Math.floor(diffSecs / 3600); let m = Math.floor((diffSecs % 3600) / 60);
+                            durationHtml = `<div class="text-xs text-gray-700 mt-2 font-bold bg-white bg-opacity-50 p-1 rounded inline-block">⏱ Время: ${h > 0 ? h + ' ч ' : ''}${m} мин</div>`;
+                        }
+                    }
+
+                    let typeBadge = isLoad ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold shadow-sm">ЗАГРУЗКА</span>' : '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold shadow-sm">ВЫГРУЗКА</span>';
+                    if (data.modified && !isCompleted && !needsReturn) typeBadge += ' <span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded font-bold ml-1 shadow-sm">⚠️ ИЗМЕНЕНА</span>';
+
+                    let cardClass = isLoad ? (isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400') : (isCompleted ? 'bg-orange-100 border-orange-500' : 'bg-white border-purple-400');
+                    if (data.modified && !isCompleted && !needsReturn) cardClass = 'bg-yellow-50 border-yellow-400';
+                    
+                    let textColor = isLoad ? (isCompleted ? 'text-green-700' : 'text-blue-800') : (isCompleted ? 'text-orange-700' : 'text-purple-800');
+                    let barColor = isLoad ? (isCompleted ? 'bg-green-500' : 'bg-blue-500') : (isCompleted ? 'bg-orange-500' : 'bg-purple-500');
+
+                    let returnAlertHtml = '';
+                    if (needsReturn) {
+                        cardClass = 'urgent-blink'; textColor = 'text-red-900';
+                        returnAlertHtml = `<div class="mt-3 bg-red-600 text-white p-2 rounded shadow-inner border border-red-800"><div class="text-sm font-bold mb-1">⚠️ ИЗМЕНЕНИЕ! ВЕРНУТЬ:</div><div class="font-mono text-xs leading-tight">${returnList.join(', ')}</div></div>`;
+                    }
+
+                    const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
+                    const hasUnread = data.messages && data.messages.length > 0 && (!data.readBy || !data.readBy.includes(currentUser.email));
+                    const chatBadge = hasUnread ? `<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>` : '';
+
+                    let actionButtons = `<div class="absolute top-2 right-2 flex gap-1 z-10"><button onclick="openChatPanel(event, '${doc.id}', '${data.carNumber}')" class="relative text-blue-600 bg-blue-50 hover:bg-blue-100 rounded p-1 shadow-sm border border-blue-200 transition ${hasUnread ? 'animate-bounce' : ''}" title="Чат">💬${chatBadge}</button>`;
+                    if (isAdmin) actionButtons += `<button onclick="editManifest(event, '${doc.id}')" class="text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Редактировать">✏️</button><button onclick="deleteManifest(event, '${doc.id}')" class="text-gray-600 hover:text-red-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Удалить">✖</button>`;
+                    actionButtons += `</div>`;
+
+                    grid.innerHTML += `
+                        <div onclick="openScanner('${doc.id}', '${data.carNumber}')" class="${cardClass} border-l-4 p-4 rounded shadow cursor-pointer hover:shadow-md transition relative">
+                            ${actionButtons}
+                            <div class="mb-3 pr-24">${typeBadge}</div>
+                            <div class="flex justify-between items-end mb-2 pr-24">
+                                <h3 class="text-xl font-bold ${textColor} leading-none">${data.carNumber}</h3><span class="text-sm font-bold ${textColor}">${scannedPlaces} / ${totalPlaces} мест</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2"><div class="${barColor} h-2.5 rounded-full" style="width: ${percent}%"></div></div>
+                            <div class="text-xs text-gray-500 mt-2">Создал: ${data.creatorEmail}</div>
+                            ${durationHtml}${returnAlertHtml}
+                        </div>`;
+                });
+                if (itemsShown === 0) grid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10 font-bold">За выбранную дату (${currentDate.toLocaleDateString('ru-RU')}) машин нет.</div>`;
+            });
+        }
+
+        // --- ЛОГИКА РАЗВЕРТЫВАНИЯ СПИСКА ---
+        let isListExpanded = false;
+        function toggleListMode() {
+            isListExpanded = !isListExpanded;
+            const listArea = document.getElementById('scan-list-area');
+            const btn = document.getElementById('toggle-list-btn');
+
+            if (isListExpanded) {
+                listArea.classList.add('expanded-list');
+                btn.innerHTML = '🔙 <b>ЗАВЕРШИТЬ СВЕРКУ (К сканеру)</b>';
+                btn.className = "bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 text-center shadow-lg z-10 w-full border-b flex justify-center items-center gap-2 transition-colors text-lg rounded-b";
+            } else {
+                listArea.classList.remove('expanded-list');
+                btn.innerHTML = '🔍 Развернуть список для сверки';
+                btn.className = "bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold p-3 text-center shadow-sm z-10 w-full border-b flex justify-center items-center gap-2 transition-colors text-sm";
+                document.getElementById('scanner-input').focus();
+            }
         }
 
         // --- СКАНЕР ---
@@ -884,117 +877,72 @@
             document.getElementById('date-ribbon').classList.add('hidden');
             document.getElementById('scan-screen').classList.remove('hidden');
             document.getElementById('scan-car-number').innerText = carNumber;
-            
             document.getElementById('sound-unlock-overlay').style.display = 'flex';
-            const input = document.getElementById('scanner-input');
-            input.value = '';
+            document.getElementById('scanner-input').value = '';
+
+            // Сбрасываем статус кнопки развертывания
+            isListExpanded = false;
+            document.getElementById('scan-list-area').classList.remove('expanded-list');
+            const btn = document.getElementById('toggle-list-btn');
+            btn.innerHTML = '🔍 Развернуть список для сверки';
+            btn.className = "bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold p-3 text-center shadow-sm z-10 w-full border-b flex justify-center items-center gap-2 transition-colors text-sm";
 
             if (unsubscribeCurrentScan) unsubscribeCurrentScan();
             unsubscribeCurrentScan = db.collection('manifests').doc(id).onSnapshot(doc => {
                 if(doc.exists) {
-                    currentManifestDoc = doc.data(); 
-                    const data = doc.data();
+                    currentManifestDoc = doc.data(); const data = doc.data();
                     const isLoad = !data.docType || data.docType === 'load';
                     
                     const docTypeBadge = document.getElementById('scan-doc-type');
                     const actionWord = document.getElementById('scan-action-word');
-                    if (isLoad) {
-                        docTypeBadge.innerText = 'ЗАГРУЗКА';
-                        docTypeBadge.className = 'ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block';
-                        actionWord.innerText = 'загружено';
-                    } else {
-                        docTypeBadge.innerText = 'ВЫГРУЗКА';
-                        docTypeBadge.className = 'ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block';
-                        actionWord.innerText = 'выгружено';
-                    }
+                    if (isLoad) { docTypeBadge.innerText = 'ЗАГРУЗКА'; docTypeBadge.className = 'ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block'; actionWord.innerText = 'загружено'; } 
+                    else { docTypeBadge.innerText = 'ВЫГРУЗКА'; docTypeBadge.className = 'ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block'; actionWord.innerText = 'выгружено'; }
 
-                    // Чат бейдж для плавающей кнопки (внутри сканера)
-                    const hasUnread = isAdmin ? data.unreadByOffice : data.unreadByWarehouse;
+                    const hasUnread = data.messages && data.messages.length > 0 && (!data.readBy || !data.readBy.includes(currentUser.email));
                     const chatBadge = document.getElementById('scan-chat-badge');
-                    if (hasUnread) {
-                        chatBadge.classList.remove('hidden');
-                    } else {
-                        chatBadge.classList.add('hidden');
-                    }
+                    if (hasUnread) chatBadge.classList.remove('hidden'); else chatBadge.classList.add('hidden');
 
-                    let totalPlaces = 0;
-                    let scannedPlaces = 0;
-                    let returns = [];
-                    
-                    const listEl = document.getElementById('manifest-items-list');
-                    listEl.innerHTML = '';
+                    let totalPlaces = 0, scannedPlaces = 0, returns = [];
+                    const listEl = document.getElementById('manifest-items-list'); listEl.innerHTML = '';
                     
                     data.items.forEach(item => {
                         if (item.status === 'removed') return; 
-
                         const iTotal = item.totalPlaces || 1;
                         const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
                         
-                        if (!item.isCancelled) {
-                            totalPlaces += iTotal;
-                            scannedPlaces += iScanned;
-                        } else if (iScanned > 0) {
-                            returns.push(`${item.code} (${iScanned} шт)`);
-                        }
+                        if (!item.isCancelled) { totalPlaces += iTotal; scannedPlaces += iScanned; } else if (iScanned > 0) { returns.push(`${item.code} (${iScanned} шт)`); }
                         
                         let liClass, icon, specialBadge = '';
-                        
-                        if (item.isCancelled) {
-                            liClass = 'bg-red-100 text-red-900 border-red-500 border-2 animate-pulse';
-                            icon = '⚠️';
-                            specialBadge = `<span class="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">ОТМЕНА! Вернуть: ${iScanned} шт</span>`;
-                        } else if (iScanned === iTotal) {
-                            liClass = isLoad ? 'bg-green-100 text-green-800 opacity-70' : 'bg-orange-100 text-orange-800 opacity-70';
-                            icon = '✓';
-                        } else if (iScanned > 0 && iScanned < iTotal) {
-                            liClass = 'bg-yellow-50 text-yellow-800 border-yellow-400 border-2';
-                            icon = '🔄';
-                        } else {
-                            liClass = 'bg-white text-gray-900 border-gray-300 border-2';
-                            icon = '⏳';
-                        }
+                        if (item.isCancelled) { liClass = 'bg-red-100 text-red-900 border-red-500 border-2 animate-pulse'; icon = '⚠️'; specialBadge = `<span class="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">ОТМЕНА! Вернуть: ${iScanned} шт</span>`; } 
+                        else if (iScanned === iTotal) { liClass = isLoad ? 'bg-green-100 text-green-800 opacity-70' : 'bg-orange-100 text-orange-800 opacity-70'; icon = '✓'; } 
+                        else if (iScanned > 0 && iScanned < iTotal) { liClass = 'bg-yellow-50 text-yellow-800 border-yellow-400 border-2'; icon = '🔄'; } 
+                        else { liClass = 'bg-white text-gray-900 border-gray-300 border-2'; icon = '⏳'; }
                         
                         let timeHtml = '';
-                        if (item.scannedAt && !item.isCancelled) {
-                            const dt = new Date(item.scannedAt);
-                            timeHtml = `<span class="text-xs text-blue-700 ml-2 font-bold">${dt.toLocaleTimeString('ru-RU')}</span>`;
-                        }
+                        if (item.scannedAt && !item.isCancelled) { const dt = new Date(item.scannedAt); timeHtml = `<span class="text-xs text-blue-700 ml-2 font-bold">${dt.toLocaleTimeString('ru-RU')}</span>`; }
 
                         listEl.innerHTML += `
                             <li class="p-2 rounded flex flex-col gap-1 ${liClass} transition-colors">
                                 <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-bold">${icon}</span>
-                                        <span class="font-bold text-sm md:text-base ${item.isCancelled ? 'line-through' : ''}">${item.code}</span>
-                                        ${timeHtml}
-                                    </div>
+                                    <div class="flex items-center gap-2"><span class="font-bold">${icon}</span><span class="font-bold text-sm md:text-base ${item.isCancelled ? 'line-through' : ''}">${item.code}</span>${timeHtml}</div>
                                     ${item.isCancelled ? specialBadge : `<span class="text-xs font-bold bg-white px-2 py-1 rounded opacity-80 border">${iScanned}/${iTotal} палет</span>`}
                                 </div>
-                                <div class="text-[10px] md:text-xs text-gray-600 font-mono ml-5">
-                                    Вес: ${item.brutto}/${item.netto} | Шт: ${item.pcs}
-                                </div>
-                            </li>
-                        `;
+                                <div class="text-[10px] md:text-xs text-gray-600 font-mono ml-5">Вес: ${item.brutto}/${item.netto} | Шт: ${item.pcs}</div>
+                            </li>`;
                     });
                     
-                    document.getElementById('scan-count').innerText = scannedPlaces;
-                    document.getElementById('scan-total').innerText = totalPlaces;
-
+                    document.getElementById('scan-count').innerText = scannedPlaces; document.getElementById('scan-total').innerText = totalPlaces;
                     const alertBar = document.getElementById('scan-alert-bar');
-                    if (returns.length > 0) {
-                        alertBar.innerHTML = `⚠️ ВНИМАНИЕ, ИЗМЕНЕНИЯ! НУЖНО ВЕРНУТЬ:<br><span class="font-mono text-sm">${returns.join(', ')}</span>`;
-                        alertBar.classList.remove('hidden');
-                    } else {
-                        alertBar.classList.add('hidden');
-                    }
-
-                } else {
-                    closeScanner();
-                }
+                    if (returns.length > 0) { alertBar.innerHTML = `⚠️ ВНИМАНИЕ, ИЗМЕНЕНИЯ! НУЖНО ВЕРНУТЬ:<br><span class="font-mono text-sm">${returns.join(', ')}</span>`; alertBar.classList.remove('hidden'); } 
+                    else { alertBar.classList.add('hidden'); }
+                } else { closeScanner(); }
             });
         }
 
         function closeScanner() {
+            // ФИКС ЧАТА: Принудительно закрываем панель чата при выходе из машины
+            closeChatPanel(); 
+            
             window.currentActivity = "Смотрит Главный экран";
             updatePresence();
             if (unsubscribeCurrentScan) unsubscribeCurrentScan();
@@ -1015,161 +963,82 @@
         async function processBarcode(code) {
             if (!code || !currentScanId) return;
             const cleanCode = code.trim().toUpperCase();
-
             const docRef = db.collection('manifests').doc(currentScanId);
             const docSnap = await docRef.get();
             if (!docSnap.exists) return;
-
-            const data = docSnap.data();
-            const items = data.items;
-            let alreadyScanned = false;
-            let foundItem = null;
-            let isUndoMode = false;
+            const data = docSnap.data(); const items = data.items;
+            let alreadyScanned = false; let foundItem = null; let isUndoMode = false;
 
             for (let i = 0; i < items.length; i++) {
                 if (items[i].code === cleanCode) {
-                    
                     if (items[i].isCancelled && items[i].scannedPlaces > 0) {
-                        items[i].scannedPlaces -= 1;
-                        items[i].scannedBy = currentUser.email;
-                        items[i].scannedAt = new Date().toISOString();
-                        
-                        if (items[i].scannedPlaces === 0) {
-                            items[i].status = 'removed';
-                            items[i].isCancelled = false;
-                        }
-                        
-                        foundItem = items[i];
-                        isUndoMode = true;
-                        await docRef.update({ items: items });
-                        showSuccessFlash(foundItem, true);
-                        return;
-
+                        items[i].scannedPlaces -= 1; items[i].scannedBy = currentUser.email; items[i].scannedAt = new Date().toISOString();
+                        if (items[i].scannedPlaces === 0) { items[i].status = 'removed'; items[i].isCancelled = false; }
+                        foundItem = items[i]; isUndoMode = true;
+                        await docRef.update({ items: items }); showSuccessFlash(foundItem, true); return;
                     } else if (!items[i].isCancelled) {
-                        const iTotal = items[i].totalPlaces || 1;
-                        const iScanned = items[i].scannedPlaces !== undefined ? items[i].scannedPlaces : (items[i].status === 'scanned' ? iTotal : 0);
-
+                        const iTotal = items[i].totalPlaces || 1; const iScanned = items[i].scannedPlaces !== undefined ? items[i].scannedPlaces : (items[i].status === 'scanned' ? iTotal : 0);
                         if (iScanned < iTotal) {
-                            items[i].scannedPlaces = iScanned + 1;
-                            items[i].scannedBy = currentUser.email;
-                            items[i].scannedAt = new Date().toISOString();
-                            
-                            if (items[i].scannedPlaces === iTotal) {
-                                items[i].status = 'scanned'; 
-                            } else {
-                                items[i].status = 'partial';
-                            }
-                            
-                            foundItem = items[i];
-                            await docRef.update({ items: items });
-                            showSuccessFlash(foundItem, false);
-                            return;
-                        } else {
-                            alreadyScanned = true;
-                        }
+                            items[i].scannedPlaces = iScanned + 1; items[i].scannedBy = currentUser.email; items[i].scannedAt = new Date().toISOString();
+                            if (items[i].scannedPlaces === iTotal) items[i].status = 'scanned'; else items[i].status = 'partial';
+                            foundItem = items[i]; await docRef.update({ items: items }); showSuccessFlash(foundItem, false); return;
+                        } else { alreadyScanned = true; }
                     }
                 }
             }
-
             const errorMsg = alreadyScanned ? `Номер ${cleanCode} УЖЕ ОБРАБОТАН!` : `Номер ${cleanCode} ЧУЖОЙ!`;
-            
-            await docRef.update({
-                errors: firebase.firestore.FieldValue.arrayUnion({
-                    code: cleanCode,
-                    message: alreadyScanned ? 'Повтор' : 'Лишний номер',
-                    scannedBy: currentUser.email,
-                    scannedAt: new Date().toISOString()
-                })
-            });
-
+            await docRef.update({ errors: firebase.firestore.FieldValue.arrayUnion({ code: cleanCode, message: alreadyScanned ? 'Повтор' : 'Лишний номер', scannedBy: currentUser.email, scannedAt: new Date().toISOString() }) });
             showErrorOverlay(errorMsg);
         }
 
         function showSuccessFlash(item, isUndo) {
             playSuccessSound();
             const area = document.getElementById('scan-flash-area');
-            
             area.className = `flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b md:border-b-0 md:border-r overflow-y-auto ${isUndo ? 'flash-orange' : 'flash-green'}`;
-            void area.offsetWidth; 
-            area.classList.add(isUndo ? 'flash-orange' : 'flash-green');
+            void area.offsetWidth; area.classList.add(isUndo ? 'flash-orange' : 'flash-green');
             
             if (isUndo) {
-                document.getElementById('scan-last-result').innerHTML = `
-                    <div class="text-orange-600 font-bold text-2xl md:text-3xl">✔ ВОЗВРАТ: ${item.code}</div>
-                    <div class="text-gray-800 font-bold text-xl mt-2 bg-orange-200 inline-block px-4 py-1 rounded shadow-sm">
-                        Осталось вернуть: ${item.scannedPlaces} палет
-                    </div>
-                `;
+                document.getElementById('scan-last-result').innerHTML = `<div class="text-orange-600 font-bold text-2xl md:text-3xl">✔ ВОЗВРАТ: ${item.code}</div><div class="text-gray-800 font-bold text-xl mt-2 bg-orange-200 inline-block px-4 py-1 rounded shadow-sm">Осталось вернуть: ${item.scannedPlaces} палет</div>`;
             } else {
-                const isDone = item.scannedPlaces === (item.totalPlaces || 1);
-                const statusText = isDone ? 'ГОТОВО' : 'В ПРОЦЕССЕ';
-                const isLoad = !currentManifestDoc.docType || currentManifestDoc.docType === 'load';
-                const actionColor = isLoad ? 'text-green-600' : 'text-orange-600';
-                
-                document.getElementById('scan-last-result').innerHTML = `
-                    <div class="${actionColor} font-bold text-2xl md:text-3xl">✔ ${item.code}</div>
-                    <div class="text-gray-800 font-bold text-xl mt-2 bg-yellow-200 inline-block px-4 py-1 rounded shadow-sm">
-                        ${item.scannedPlaces} из ${item.totalPlaces || 1} палет (${statusText})
-                    </div>
-                    <div class="text-gray-600 font-bold text-lg mt-2">Вес (B/N): ${item.brutto} / ${item.netto} кг</div>
-                `;
+                const isDone = item.scannedPlaces === (item.totalPlaces || 1); const statusText = isDone ? 'ГОТОВО' : 'В ПРОЦЕССЕ';
+                const isLoad = !currentManifestDoc.docType || currentManifestDoc.docType === 'load'; const actionColor = isLoad ? 'text-green-600' : 'text-orange-600';
+                document.getElementById('scan-last-result').innerHTML = `<div class="${actionColor} font-bold text-2xl md:text-3xl">✔ ${item.code}</div><div class="text-gray-800 font-bold text-xl mt-2 bg-yellow-200 inline-block px-4 py-1 rounded shadow-sm">${item.scannedPlaces} из ${item.totalPlaces || 1} палет (${statusText})</div><div class="text-gray-600 font-bold text-lg mt-2">Вес (B/N): ${item.brutto} / ${item.netto} кг</div>`;
             }
         }
 
-        function showErrorOverlay(message) {
-            playErrorSound();
-            document.getElementById('error-message').innerText = message;
-            document.getElementById('error-overlay').style.display = 'flex';
-            document.getElementById('scanner-input').blur(); 
-        }
-
-        function closeErrorOverlay() {
-            document.getElementById('error-overlay').style.display = 'none';
-            document.getElementById('scanner-input').focus(); 
-        }
+        function showErrorOverlay(message) { playErrorSound(); document.getElementById('error-message').innerText = message; document.getElementById('error-overlay').style.display = 'flex'; document.getElementById('scanner-input').blur(); }
+        function closeErrorOverlay() { document.getElementById('error-overlay').style.display = 'none'; document.getElementById('scanner-input').focus(); }
 
         // --- ВНУТРЕННИЙ ЧАТ ---
         function openChatPanel(e, manifestId = null, carNum = null) {
             if(e) e.stopPropagation();
-            
-            if (manifestId) activeChatManifestId = manifestId;
-            else activeChatManifestId = currentScanId; 
-            
+            if (manifestId) activeChatManifestId = manifestId; else activeChatManifestId = currentScanId; 
             if (!carNum && currentManifestDoc) carNum = currentManifestDoc.carNumber;
             
             document.getElementById('chat-title-car').innerText = carNum || '';
             document.getElementById('chat-panel').classList.remove('translate-x-full');
             
-            const updateField = isAdmin ? { unreadByOffice: false } : { unreadByWarehouse: false };
-            db.collection('manifests').doc(activeChatManifestId).update(updateField);
+            db.collection('manifests').doc(activeChatManifestId).update({ readBy: firebase.firestore.FieldValue.arrayUnion(currentUser.email) });
 
             if(unsubscribeChat) unsubscribeChat();
             unsubscribeChat = db.collection('manifests').doc(activeChatManifestId).onSnapshot(doc => {
                 if(!doc.exists) return;
-                const data = doc.data();
-                const msgs = data.messages || [];
-                const container = document.getElementById('chat-messages');
+                const data = doc.data(); const msgs = data.messages || []; const container = document.getElementById('chat-messages');
                 
                 if (msgs.length === 0) {
-                    container.innerHTML = `<div class="text-center text-gray-400 mt-10 text-sm">Нет сообщений. Напишите первым!</div>`;
+                    container.innerHTML = `<div class="text-center text-gray-400 mt-10 text-sm font-bold">Нет сообщений. Напишите первым!</div>`;
                 } else {
                     container.innerHTML = msgs.map(m => {
-                        const isMe = m.sender === currentUser.email;
-                        const align = isMe ? 'text-right' : 'text-left';
-                        const bg = isMe ? 'bg-blue-100 text-blue-900 border border-blue-200' : 'bg-gray-100 text-gray-800 border border-gray-200';
-                        const date = new Date(m.timestamp).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
-                        const name = m.sender.split('@')[0];
-                        return `
-                            <div class="${align} mb-3">
-                                <div class="text-[10px] text-gray-500 mb-0.5 font-bold">${m.senderRole} (${name}) • ${date}</div>
-                                <div class="inline-block p-2 rounded-lg ${bg} text-sm shadow-sm text-left max-w-[85%]">${m.text}</div>
-                            </div>`;
+                        const isMe = m.sender === currentUser.email; const align = isMe ? 'text-right' : 'text-left'; const bg = isMe ? 'bg-blue-100 text-blue-900 border border-blue-200' : 'bg-gray-100 text-gray-800 border border-gray-200';
+                        const date = new Date(m.timestamp).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'}); const name = m.sender.split('@')[0];
+                        return `<div class="${align} mb-3"><div class="text-[10px] text-gray-500 mb-0.5 font-bold">${m.senderRole} (${name}) • ${date}</div><div class="inline-block p-2 rounded-lg ${bg} text-sm shadow-sm text-left max-w-[85%]">${m.text}</div></div>`;
                     }).join('');
                     container.scrollTop = container.scrollHeight;
                 }
                 
-                if (isAdmin && data.unreadByOffice) db.collection('manifests').doc(activeChatManifestId).update({unreadByOffice: false});
-                if (!isAdmin && data.unreadByWarehouse) db.collection('manifests').doc(activeChatManifestId).update({unreadByWarehouse: false});
+                if (data.messages && data.messages.length > 0 && (!data.readBy || !data.readBy.includes(currentUser.email))) {
+                    db.collection('manifests').doc(activeChatManifestId).update({ readBy: firebase.firestore.FieldValue.arrayUnion(currentUser.email) });
+                }
             });
         }
 
@@ -1180,190 +1049,77 @@
             document.getElementById('scanner-input')?.focus();
         }
 
-        document.getElementById('chat-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                sendChatMessage();
-            }
-        });
+        document.getElementById('chat-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); } });
 
         async function sendChatMessage(quickText = null) {
             const input = document.getElementById('chat-input');
             const text = quickText || input.value.trim();
             if (!text || !activeChatManifestId) return;
-            
             input.value = ''; 
-
             await db.collection('manifests').doc(activeChatManifestId).update({
-                messages: firebase.firestore.FieldValue.arrayUnion({
-                    text: text,
-                    sender: currentUser.email,
-                    senderRole: isAdmin ? 'Офис' : 'Склад',
-                    timestamp: new Date().toISOString()
-                }),
-                unreadByOffice: !isAdmin,     
-                unreadByWarehouse: isAdmin    
+                messages: firebase.firestore.FieldValue.arrayUnion({ text: text, sender: currentUser.email, senderRole: isAdmin ? 'Офис' : 'Склад', timestamp: new Date().toISOString() }),
+                readBy: [currentUser.email]
             });
         }
-
 
         // --- ПЕЧАТЬ PDF ---
         function generatePDF() {
             if (!currentManifestDoc) return;
-            const data = currentManifestDoc;
-            const isLoad = !data.docType || data.docType === 'load';
-            const actionVerb = isLoad ? "ЗАГРУЗКИ" : "ВЫГРУЗКИ";
-            const itemVerb = isLoad ? "Загружено" : "Выгружено";
+            const data = currentManifestDoc; const isLoad = !data.docType || data.docType === 'load';
+            const actionVerb = isLoad ? "ЗАГРУЗКИ" : "ВЫГРУЗКИ"; const itemVerb = isLoad ? "Загружено" : "Выгружено";
             
-            let totalPlaces = 0;
-            let scannedPlaces = 0;
-            let lastScanDt = null;
-
+            let totalPlaces = 0, scannedPlaces = 0, lastScanDt = null;
             data.items.forEach(i => {
                 if (i.status === 'removed') return;
-                
-                totalPlaces += (i.totalPlaces || 1);
-                scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
-                
-                if (i.scannedAt && !i.isCancelled) {
-                    let dt = new Date(i.scannedAt);
-                    if (!lastScanDt || dt > lastScanDt) lastScanDt = dt;
-                }
+                totalPlaces += (i.totalPlaces || 1); scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
+                if (i.scannedAt && !i.isCancelled) { let dt = new Date(i.scannedAt); if (!lastScanDt || dt > lastScanDt) lastScanDt = dt; }
             });
             
-            let createdDt = null;
-            if (data.createdAt) {
-                createdDt = typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(data.createdAt);
-            }
-            let createdStr = createdDt ? createdDt.toLocaleString('ru-RU') : '-';
-            let lastScanStr = lastScanDt ? lastScanDt.toLocaleString('ru-RU') : 'Нет сканирований';
+            let createdDt = null; if (data.createdAt) createdDt = typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(data.createdAt);
+            let createdStr = createdDt ? createdDt.toLocaleString('ru-RU') : '-'; let lastScanStr = lastScanDt ? lastScanDt.toLocaleString('ru-RU') : 'Нет сканирований';
             
             let durationStr = "-";
             if (createdDt && lastScanDt) {
                 let diffSecs = Math.floor((lastScanDt - createdDt) / 1000);
                 if (diffSecs >= 0) {
-                    let h = Math.floor(diffSecs / 3600);
-                    let m = Math.floor((diffSecs % 3600) / 60);
-                    let s = diffSecs % 60;
-                    let parts = [];
-                    if (h > 0) parts.push(h + ' ч');
-                    if (m > 0 || h > 0) parts.push(m + ' мин');
-                    parts.push(s + ' сек');
-                    durationStr = parts.join(' ');
+                    let h = Math.floor(diffSecs / 3600); let m = Math.floor((diffSecs % 3600) / 60); let s = diffSecs % 60;
+                    let parts = []; if (h > 0) parts.push(h + ' ч'); if (m > 0 || h > 0) parts.push(m + ' мин'); parts.push(s + ' сек'); durationStr = parts.join(' ');
                 }
             }
 
-            let html = `
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <h1 style="font-size: 24px; font-family: sans-serif; margin-bottom: 5px;">АКТ ${actionVerb} Т/С</h1>
-                    <p style="font-size: 18px; font-weight: bold; margin: 0;">Автомобиль: ${data.carNumber}</p>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; font-family: sans-serif; font-size: 14px; margin-bottom: 20px; background: #f3f4f6; padding: 10px; border-radius: 5px;">
-                    <div>
-                        <p style="margin: 3px 0;"><strong>Создана (Офис):</strong> ${createdStr}</p>
-                        <p style="margin: 3px 0;"><strong>Автор:</strong> ${data.creatorEmail}</p>
-                        <p style="margin: 3px 0;"><strong>Последний скан:</strong> ${lastScanStr}</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p style="margin: 3px 0; font-size: 16px;"><strong>Время обработки: <span style="color: #1d4ed8;">${durationStr}</span></strong></p>
-                        <p style="margin: 3px 0; font-size: 16px;"><strong>Итог:</strong> ${itemVerb} ${scannedPlaces} из ${totalPlaces} мест</p>
-                    </div>
-                </div>
-                
-                <table class="print-table">
-                    <thead><tr><th>№</th><th>Код</th><th>Места</th><th>Brutto</th><th>Netto</th><th>PCS</th><th>Статус</th><th>Время скана</th></tr></thead>
-                    <tbody>
-            `;
-
+            let html = `<div style="text-align: center; margin-bottom: 20px;"><h1 style="font-size: 24px; font-family: sans-serif; margin-bottom: 5px;">АКТ ${actionVerb} Т/С</h1><p style="font-size: 18px; font-weight: bold; margin: 0;">Автомобиль: ${data.carNumber}</p></div><div style="display: flex; justify-content: space-between; font-family: sans-serif; font-size: 14px; margin-bottom: 20px; background: #f3f4f6; padding: 10px; border-radius: 5px;"><div><p style="margin: 3px 0;"><strong>Создана (Офис):</strong> ${createdStr}</p><p style="margin: 3px 0;"><strong>Автор:</strong> ${data.creatorEmail}</p><p style="margin: 3px 0;"><strong>Последний скан:</strong> ${lastScanStr}</p></div><div style="text-align: right;"><p style="margin: 3px 0; font-size: 16px;"><strong>Время обработки: <span style="color: #1d4ed8;">${durationStr}</span></strong></p><p style="margin: 3px 0; font-size: 16px;"><strong>Итог:</strong> ${itemVerb} ${scannedPlaces} из ${totalPlaces} мест</p></div></div><table class="print-table"><thead><tr><th>№</th><th>Код</th><th>Места</th><th>Brutto</th><th>Netto</th><th>PCS</th><th>Статус</th><th>Время скана</th></tr></thead><tbody>`;
             let idx = 1;
             data.items.forEach((item) => {
                 if (item.status === 'removed') return; 
-                
-                const iTotal = item.totalPlaces || 1;
-                const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
-                
+                const iTotal = item.totalPlaces || 1; const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
                 let statusTxt = "";
-                if (item.isCancelled) statusTxt = "⚠️ ОШИБКА (ВЕРНУТЬ)";
-                else if (iScanned === iTotal) statusTxt = itemVerb.toUpperCase();
-                else if (iScanned > 0) statusTxt = "ЧАСТИЧНО";
-                else statusTxt = "ОЖИДАЕТ";
-                
-                let timeTxt = "-";
-                if (item.scannedAt && !item.isCancelled) {
-                    const dt = new Date(item.scannedAt);
-                    timeTxt = dt.toLocaleDateString('ru-RU') + " " + dt.toLocaleTimeString('ru-RU', { hour12: false });
-                }
-
-                html += `<tr>
-                    <td>${idx++}</td>
-                    <td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${item.code}</td>
-                    <td>${iScanned} из ${iTotal}</td>
-                    <td>${item.brutto}</td>
-                    <td>${item.netto}</td>
-                    <td>${item.pcs}</td>
-                    <td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${statusTxt}</td>
-                    <td>${timeTxt}</td>
-                </tr>`;
+                if (item.isCancelled) statusTxt = "⚠️ ОШИБКА (ВЕРНУТЬ)"; else if (iScanned === iTotal) statusTxt = itemVerb.toUpperCase(); else if (iScanned > 0) statusTxt = "ЧАСТИЧНО"; else statusTxt = "ОЖИДАЕТ";
+                let timeTxt = "-"; if (item.scannedAt && !item.isCancelled) { const dt = new Date(item.scannedAt); timeTxt = dt.toLocaleDateString('ru-RU') + " " + dt.toLocaleTimeString('ru-RU', { hour12: false }); }
+                html += `<tr><td>${idx++}</td><td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${item.code}</td><td>${iScanned} из ${iTotal}</td><td>${item.brutto}</td><td>${item.netto}</td><td>${item.pcs}</td><td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${statusTxt}</td><td>${timeTxt}</td></tr>`;
             });
-
             html += `</tbody></table>`;
 
             if (data.editHistory && data.editHistory.length > 0) {
-                html += `
-                    <h3 style="margin-top:30px; font-family: sans-serif; font-size: 16px;">История изменений ведомости (Офис):</h3>
-                    <table class="print-table" style="margin-top: 10px;">
-                        <thead><tr><th>№</th><th>Дата и Время</th><th>Сотрудник</th><th>Добавлены</th><th>Удалены</th><th>Изменено кол-во мест</th></tr></thead>
-                        <tbody>
-                `;
+                html += `<h3 style="margin-top:30px; font-family: sans-serif; font-size: 16px;">История изменений ведомости (Офис):</h3><table class="print-table" style="margin-top: 10px;"><thead><tr><th>№</th><th>Дата и Время</th><th>Сотрудник</th><th>Добавлены</th><th>Удалены</th><th>Изменено кол-во мест</th></tr></thead><tbody>`;
                 data.editHistory.forEach((log, index) => {
-                    let logTime = new Date(log.editedAt);
-                    let formattedLogTime = logTime.toLocaleDateString('ru-RU') + " " + logTime.toLocaleTimeString('ru-RU', { hour12: false });
-                    
-                    let addedText = log.added && log.added.length > 0 ? log.added.join(', ') : '-';
-                    let removedText = log.removed && log.removed.length > 0 ? log.removed.join(', ') : '-';
-                    let changedText = log.changed && log.changed.length > 0 ? log.changed.join(', ') : '-';
-
-                    html += `<tr>
-                        <td>${index + 1}</td>
-                        <td>${formattedLogTime}</td>
-                        <td>${log.editedBy}</td>
-                        <td style="color: green;">${addedText}</td>
-                        <td style="color: red;">${removedText}</td>
-                        <td style="color: blue;">${changedText}</td>
-                    </tr>`;
+                    let logTime = new Date(log.editedAt); let formattedLogTime = logTime.toLocaleDateString('ru-RU') + " " + logTime.toLocaleTimeString('ru-RU', { hour12: false });
+                    let addedText = log.added && log.added.length > 0 ? log.added.join(', ') : '-'; let removedText = log.removed && log.removed.length > 0 ? log.removed.join(', ') : '-'; let changedText = log.changed && log.changed.length > 0 ? log.changed.join(', ') : '-';
+                    html += `<tr><td>${index + 1}</td><td>${formattedLogTime}</td><td>${log.editedBy}</td><td style="color: green;">${addedText}</td><td style="color: red;">${removedText}</td><td style="color: blue;">${changedText}</td></tr>`;
                 });
                 html += `</tbody></table>`;
             }
 
             if (data.errors && data.errors.length > 0) {
-                html += `
-                    <h3 style="margin-top:30px; color: red; font-family: sans-serif; font-size: 16px;">Ошибочные сканирования (лишние номера):</h3>
-                    <table class="print-table" style="margin-top: 10px;">
-                        <thead><tr><th>№</th><th>Отсканированный код</th><th>Тип ошибки</th><th>Сотрудник</th><th>Время скана</th></tr></thead>
-                        <tbody>
-                `;
+                html += `<h3 style="margin-top:30px; color: red; font-family: sans-serif; font-size: 16px;">Ошибочные сканирования (лишние номера):</h3><table class="print-table" style="margin-top: 10px;"><thead><tr><th>№</th><th>Отсканированный код</th><th>Тип ошибки</th><th>Сотрудник</th><th>Время скана</th></tr></thead><tbody>`;
                 data.errors.forEach((err, index) => {
-                    let errTimeTxt = "-";
-                    if (err.scannedAt) {
-                        const dt = new Date(err.scannedAt);
-                        errTimeTxt = dt.toLocaleDateString('ru-RU') + " " + dt.toLocaleTimeString('ru-RU', { hour12: false });
-                    }
+                    let errTimeTxt = "-"; if (err.scannedAt) { const dt = new Date(err.scannedAt); errTimeTxt = dt.toLocaleDateString('ru-RU') + " " + dt.toLocaleTimeString('ru-RU', { hour12: false }); }
                     html += `<tr><td>${index + 1}</td><td>${err.code}</td><td>${err.message}</td><td>${err.scannedBy}</td><td>${errTimeTxt}</td></tr>`;
                 });
                 html += `</tbody></table>`;
             }
 
-            html += `
-                <div class="signature-block">
-                    <div><p>Сдал (Склад): _______________________</p></div>
-                    <div><p>Принял (Водитель): _______________________</p></div>
-                </div>
-            `;
-
-            document.getElementById('print-area').innerHTML = html;
-            document.getElementById('print-area').classList.remove('hidden');
-            window.print();
+            html += `<div class="signature-block"><div><p>Сдал (Склад): _______________________</p></div><div><p>Принял (Водитель): _______________________</p></div></div>`;
+            document.getElementById('print-area').innerHTML = html; document.getElementById('print-area').classList.remove('hidden'); window.print();
         }
 
         window.onafterprint = function() { document.getElementById('print-area').classList.add('hidden'); };
