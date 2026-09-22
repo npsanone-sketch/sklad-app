@@ -189,7 +189,6 @@
             <p class="mt-6 text-blue-200 text-center px-4" data-i18n="unlock_warn">Увага: Переконайтеся, що телефон НЕ в беззвучному режимі!</p>
         </div>
 
-        <!-- ФІКС №1: Додано z-50 та relative, щоб панель була ПОВЕРХ вікна звуку -->
         <div class="bg-gray-200 dark:bg-gray-800 p-4 flex justify-between items-center border-b dark:border-gray-700 shrink-0 z-50 shadow-sm relative">
             <div class="flex flex-col md:flex-row md:items-center gap-2">
                 <div>
@@ -218,7 +217,6 @@
                 <input type="text" id="scanner-input" autocomplete="off" class="w-full max-w-2xl text-center text-2xl md:text-4xl font-mono border-4 border-blue-400 dark:border-blue-600 rounded-lg p-4 md:p-6 shadow-inner focus:outline-none focus:border-blue-600 focus:bg-blue-50 dark:bg-gray-800 dark:text-white dark:focus:bg-gray-700" placeholder="...">
                 <button onclick="document.getElementById('scanner-input').focus()" class="mt-4 text-sm text-blue-500 dark:text-blue-400 underline font-bold" data-i18n="focus_scanner">Повернути фокус сканеру</button>
                 <div id="scan-last-result" class="mt-6 text-center h-24 flex flex-col justify-center"></div>
-                <!-- Індикатор блокування -->
                 <div id="scan-locked-msg" class="hidden mt-4 text-red-600 font-bold text-xl bg-red-100 px-6 py-2 rounded-full border border-red-400 shadow" data-i18n="msg_locked">🔒 ЗМІНУ ЗАКРИТО (СКАНИ НЕ ПРИЙМАЮТЬСЯ)</div>
             </div>
 
@@ -265,9 +263,6 @@
     <div id="print-area" class="hidden bg-white"></div>
 
     <script>
-        // =========================================================================
-        // НАЛАШТУВАННЯ TELEGRAM
-        // =========================================================================
         const TELEGRAM_BOT_TOKEN = '8740839645:AAGcJeWS79f1Y3mcKAastQbu8pd6SJopt1E'; 
         const TELEGRAM_CHAT_ID = '-4634875558';
 
@@ -279,9 +274,6 @@
             }).catch(e => console.error("Помилка відправки Telegram", e));
         }
 
-        // =========================================================================
-        // ПЕРЕКЛАДИ (Багатомовність)
-        // =========================================================================
         const dict = {
             ua: {
                 login_title: 'Вхід у систему', email: 'Електронна пошта', password: 'Пароль', login_btn: 'Увійти', login_error: 'Помилка входу!',
@@ -373,7 +365,7 @@
                 }
             });
             updateManifestCount();
-            if (currentScanId && isListExpanded) toggleListMode(true); 
+            if (typeof currentScanId !== 'undefined' && currentScanId && isListExpanded) toggleListMode(true); 
         }
 
         function changeLang(lang) {
@@ -382,9 +374,6 @@
             if(!document.getElementById('analytics-screen').classList.contains('hidden')) loadAnalyticsData();
         }
 
-        // =========================================================================
-        // ТЕМА (Нічна/Світла)
-        // =========================================================================
         let isDarkMode = localStorage.getItem('app_theme') === 'dark';
         if (isDarkMode) document.documentElement.classList.add('dark');
         updateThemeIcon();
@@ -396,17 +385,12 @@
         }
         function updateThemeIcon() { document.getElementById('theme-icon').innerText = isDarkMode ? '☀️' : '🌙'; }
 
-        // =========================================================================
-        // ДОСТУП ТА FIREBASE
-        // =========================================================================
         const ADMIN_EMAILS = [
             'skypochka.v@novapost.pl', 'mazuryk.o@novapost.pl', 'herasymov.d@novapost.pl',
             'shelemon.a@novapost.pl', 'kyzhlai.o@novapost.pl', 'yeremenko.m@novapost.pl', 'kryvonozhkin.o@novapost.pl'
         ]; 
         
         let isAdmin = false;
-        
-        // ФІКС №3: Жорстка фіксація локальної дати, щоб не було сірого екрану при вході
         let currentDate = new Date(); 
         window.currentActivity = "Смотрит Главный экран";
 
@@ -426,9 +410,8 @@
         const auth = firebase.auth();
 
         let currentUser = null; let unsubscribeManifests = null; let unsubscribeCurrentScan = null; let unsubscribeChat = null;
-        let currentManifestDoc = null; let editingManifestId = null; let activeChatManifestId = null;
+        let currentManifestDoc = null; let editingManifestId = null; let activeChatManifestId = null; let currentScanId = null;
         
-        // --- АУДІО ---
         let audioCtx = null;
         document.addEventListener('click', () => {
             if (!audioCtx) { const AudioContext = window.AudioContext || window.webkitAudioContext; audioCtx = new AudioContext(); }
@@ -467,7 +450,6 @@
             play(500, audioCtx.currentTime); play(700, audioCtx.currentTime + 0.15);
         }
 
-        // --- PRESENCE (ФІКС №2: Надійна система статусу онлайн) ---
         let presenceInterval = null;
         async function updatePresence() {
             if(!currentUser) return;
@@ -475,7 +457,7 @@
                 await db.collection('presence').doc(currentUser.email).set({
                     email: currentUser.email, role: isAdmin ? t('role_office') : t('role_warehouse'),
                     activity: window.currentActivity, 
-                    lastActive: firebase.firestore.FieldValue.serverTimestamp() // Тільки надійний час сервера
+                    lastActive: firebase.firestore.FieldValue.serverTimestamp() 
                 }, {merge: true});
             } catch(e) {}
         }
@@ -488,7 +470,7 @@
             db.collection('presence').onSnapshot(snap => {
                 let onlineCount = 0; let html = ''; 
                 snap.forEach(doc => {
-                    const d = doc.data({ serverTimestamps: 'estimate' }); // Виключає проблему з Null при записі
+                    const d = doc.data({ serverTimestamps: 'estimate' }); 
                     if(!d.lastActive) return;
                     
                     let diff = (Date.now() - d.lastActive.toMillis()) / 1000;
@@ -510,7 +492,6 @@
         function togglePresenceModal() { document.getElementById('presence-modal').classList.toggle('hidden'); }
         window.addEventListener('beforeunload', () => { if(currentUser) db.collection('presence').doc(currentUser.email).delete(); });
 
-        // --- КАЛЕНДАР (ФІКС №3: Зрізана математика таймзон) ---
         function getLocalISODate(d) {
             const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
@@ -541,11 +522,10 @@
             const parts = val.split('-');
             currentDate = new Date();
             currentDate.setFullYear(parts[0], parts[1] - 1, parts[2]);
-            currentDate.setHours(12, 0, 0, 0); // Захист від зміщення при літньому часі
+            currentDate.setHours(12, 0, 0, 0); 
             updateDateDisplay(); loadDashboard(); 
         }
 
-        // --- АНАЛІТИКА ---
         function openAnalytics() {
             document.getElementById('dashboard-screen').classList.add('hidden'); document.getElementById('date-ribbon').classList.add('hidden'); document.getElementById('scan-screen').classList.add('hidden');
             document.getElementById('analytics-screen').classList.remove('hidden'); window.currentActivity = t('analytics'); updatePresence(); loadAnalyticsData();
@@ -617,7 +597,6 @@
             });
         }
 
-        // --- АВТОРИЗАЦІЯ ---
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user; isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
@@ -626,12 +605,11 @@
                 let roleLabel = isAdmin ? t('role_office') : t('role_warehouse');
                 document.getElementById('user-info').innerHTML = `${user.email} <span class="bg-blue-900 text-white px-2 py-0.5 rounded ml-2 text-xs font-bold shadow-sm">${roleLabel}</span>`;
                 
-              if (isAdmin) { document.getElementById('create-btn').classList.remove('hidden'); document.getElementById('chat-quick-replies').classList.add('hidden'); } 
+                if (isAdmin) { document.getElementById('create-btn').classList.remove('hidden'); document.getElementById('chat-quick-replies').classList.add('hidden'); } 
                 else { document.getElementById('create-btn').classList.add('hidden'); document.getElementById('chat-quick-replies').classList.remove('hidden'); }
 
-                // УДАЛИТЕ СТРОЧКУ fixCalendarDate(); КОТОРАЯ БЫЛА ЗДЕСЬ
                 translateUI(); 
-                updateDateDisplay(); // Викликаємо одразу чистий локальний час
+                updateDateDisplay(); 
                 startPresenceTracker(); 
                 loadDashboard();
             } else {
@@ -649,7 +627,6 @@
         }
         function logout() { if(currentUser) db.collection('presence').doc(currentUser.email).delete(); auth.signOut(); }
 
-        // --- ПАРСЕР ТА СТВОРЕННЯ ---
         function parseExcelData(text) {
             const lines = text.split('\n'); const items = []; const seen = new Set();
             lines.forEach(line => {
@@ -751,12 +728,10 @@
 
         async function deleteManifest(event, id) { event.stopPropagation(); if (!isAdmin) return; if (confirm("Delete?")) await db.collection('manifests').doc(id).delete(); }
 
-        // --- ДАШБОРД ---
         function loadDashboard() {
             window.currentActivity = "Смотрит Главный экран"; updatePresence();
             if (unsubscribeManifests) unsubscribeManifests();
             
-            // Жорстко беремо локальний час початку і кінця поточної дати
             const startOfDay = new Date(currentDate); startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date(currentDate); endOfDay.setHours(23, 59, 59, 999);
 
@@ -777,7 +752,6 @@
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     let docDate = data.createdAt ? data.createdAt.toDate() : new Date();
-                    // Відсікаємо те, що не вписується в нашу обрану локальну добу
                     if (docDate < startOfDay || docDate > endOfDay) return; 
                     
                     itemsShown++;
@@ -857,7 +831,6 @@
             });
         }
 
-        // --- ЛОГІКА РОЗГОРТАННЯ СПИСКУ ---
         let isListExpanded = false;
         function toggleListMode(forceRefresh = false) {
             if(!forceRefresh) isListExpanded = !isListExpanded;
@@ -874,7 +847,6 @@
             }
         }
 
-        // --- ФІКСАЦІЯ ПЕРЕДАЧІ ЗМІНИ (З ВІДПРАВКОЮ У TELEGRAM) ---
         async function finishShiftTransfer() {
             if (!currentManifestDoc || currentManifestDoc.locked) return;
             const data = currentManifestDoc;
@@ -906,7 +878,6 @@
             }
         }
 
-        // --- СКАНЕР ---
         function openScanner(id, carNumber) {
             currentScanId = id; window.currentActivity = `В авто: ${carNumber}`; updatePresence();
             document.getElementById('dashboard-screen').classList.add('hidden'); document.getElementById('date-ribbon').classList.add('hidden'); document.getElementById('scan-screen').classList.remove('hidden');
@@ -1030,7 +1001,6 @@
         function showErrorOverlay(message) { playErrorSound(); document.getElementById('error-message').innerText = message; document.getElementById('error-overlay').style.display = 'flex'; document.getElementById('scanner-input').blur(); }
         function closeErrorOverlay() { document.getElementById('error-overlay').style.display = 'none'; if(!currentManifestDoc.locked) document.getElementById('scanner-input').focus(); }
 
-        // --- ВНУТРІШНІЙ ЧАТ ---
         function openChatPanel(e, manifestId = null, carNum = null) {
             if(e) e.stopPropagation();
             if (manifestId) activeChatManifestId = manifestId; else activeChatManifestId = currentScanId; 
@@ -1069,7 +1039,6 @@
             });
         }
 
-        // --- ДРУК PDF ---
         function generatePDF() {
             if (!currentManifestDoc) return;
             const data = currentManifestDoc; const docType = data.docType || 'load';
