@@ -626,9 +626,10 @@
                 let roleLabel = isAdmin ? t('role_office') : t('role_warehouse');
                 document.getElementById('user-info').innerHTML = `${user.email} <span class="bg-blue-900 text-white px-2 py-0.5 rounded ml-2 text-xs font-bold shadow-sm">${roleLabel}</span>`;
                 
-                if (isAdmin) { document.getElementById('create-btn').classList.remove('hidden'); document.getElementById('chat-quick-replies').classList.add('hidden'); } 
+              if (isAdmin) { document.getElementById('create-btn').classList.remove('hidden'); document.getElementById('chat-quick-replies').classList.add('hidden'); } 
                 else { document.getElementById('create-btn').classList.add('hidden'); document.getElementById('chat-quick-replies').classList.remove('hidden'); }
 
+                // УДАЛИТЕ СТРОЧКУ fixCalendarDate(); КОТОРАЯ БЫЛА ЗДЕСЬ
                 translateUI(); 
                 updateDateDisplay(); // Викликаємо одразу чистий локальний час
                 startPresenceTracker(); 
