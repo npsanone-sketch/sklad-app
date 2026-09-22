@@ -71,7 +71,6 @@
                 <option value="pl">🇵🇱 PL</option>
                 <option value="en">🇬🇧 EN</option>
             </select>
-            <!-- Кнопка Аналітики тепер доступна всім -->
             <button id="nav-analytics-btn" onclick="openAnalytics()" class="text-xs md:text-sm bg-purple-600 hover:bg-purple-500 px-2 md:px-3 py-1 rounded-full font-bold shadow transition flex items-center gap-1 border border-purple-400">
                 📊 <span class="hidden md:inline" data-i18n="analytics">Аналітика</span>
             </button>
@@ -87,18 +86,20 @@
                     <div id="presence-list" class="max-h-60 overflow-y-auto space-y-2"></div>
                 </div>
             </div>
-            <button onclick="logout()" class="text-xs md:text-sm bg-blue-700 hover:bg-blue-600 px-2 md:px-3 py-1 rounded" data-i18n="logout">Вийти</button>
+            <button onclick="logout()" class="text-xs md:text-sm bg-blue-700 hover:bg-blue-600 px-2 md:px-3 py-1 rounded flex items-center gap-1">
+                <span class="md:hidden">🚪</span><span class="hidden md:inline" data-i18n="logout">Вийти</span>
+            </button>
         </div>
     </header>
 
     <!-- ПАНЕЛЬ АРХІВУ ДАТ -->
     <div id="date-ribbon" class="bg-white dark:bg-gray-800 shadow-sm px-4 py-3 flex justify-between items-center no-print shrink-0 border-b dark:border-gray-700 z-10 hidden">
-        <button onclick="changeDate(-1)" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 font-bold text-sm shadow-sm transition">&larr; <span data-i18n="prev">Попередній</span></button>
+        <button onclick="changeDate(-1)" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 font-bold text-sm shadow-sm transition">&larr; <span data-i18n="prev">Попередній</span></button>
         <div class="flex items-center gap-2">
             <span id="current-date-display" class="font-bold text-lg md:text-xl text-blue-800 dark:text-blue-400">Сьогодні</span>
             <input type="date" id="date-picker" onchange="setDateFromPicker(this.value)" class="border dark:border-gray-600 rounded px-2 py-1 text-sm bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 cursor-pointer shadow-inner focus:outline-none">
         </div>
-        <button onclick="changeDate(1)" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 font-bold text-sm shadow-sm transition"><span data-i18n="next">Наступний</span> &rarr;</button>
+        <button onclick="changeDate(1)" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 font-bold text-sm shadow-sm transition"><span data-i18n="next">Наступний</span> &rarr;</button>
     </div>
 
     <!-- Головний екран (Дашборд ведомостей) -->
@@ -188,14 +189,16 @@
             <p class="mt-6 text-blue-200 text-center px-4" data-i18n="unlock_warn">Увага: Переконайтеся, що телефон НЕ в беззвучному режимі!</p>
         </div>
 
-        <div class="bg-gray-200 dark:bg-gray-800 p-4 flex justify-between items-center border-b dark:border-gray-700 shrink-0 z-20 shadow-sm">
+        <!-- ФІКС №1: Додано z-50 та relative, щоб панель була ПОВЕРХ вікна звуку -->
+        <div class="bg-gray-200 dark:bg-gray-800 p-4 flex justify-between items-center border-b dark:border-gray-700 shrink-0 z-50 shadow-sm relative">
             <div class="flex flex-col md:flex-row md:items-center gap-2">
                 <div>
-                    <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded font-bold mr-2 text-sm">&larr; <span data-i18n="back">Назад</span></button>
+                    <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded font-bold mr-2 text-sm flex items-center gap-1 inline-flex">
+                        <span>&larr;</span> <span data-i18n="back">Назад</span>
+                    </button>
                     <span class="text-lg md:text-xl font-bold dark:text-white" id="scan-car-number">АВТОМОБІЛЬ</span>
                     <span id="scan-doc-type" class="ml-2 text-xs md:text-sm px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block"></span>
                 </div>
-                <!-- Кнопка фіксації передачі зміни -->
                 <button id="btn-finish-transfer" onclick="finishShiftTransfer()" class="hidden bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-bold text-sm shadow animate-pulse" data-i18n="finish_transfer_btn">🔒 Завершити звірку</button>
             </div>
             
@@ -263,13 +266,13 @@
 
     <script>
         // =========================================================================
-        // НАЛАШТУВАННЯ TELEGRAM (Заповніть своїми даними!)
+        // НАЛАШТУВАННЯ TELEGRAM
         // =========================================================================
         const TELEGRAM_BOT_TOKEN = '8740839645:AAGcJeWS79f1Y3mcKAastQbu8pd6SJopt1E'; 
         const TELEGRAM_CHAT_ID = '-4634875558';
 
         function sendTelegramMessage(text) {
-            if (TELEGRAM_BOT_TOKEN === 'YOUR_BOT_TOKEN_HERE') { console.warn("Telegram не налаштовано"); return; }
+            if (TELEGRAM_BOT_TOKEN === 'YOUR_BOT_TOKEN_HERE') return;
             fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: text, parse_mode: 'HTML' })
@@ -402,7 +405,9 @@
         ]; 
         
         let isAdmin = false;
-        let currentDate = new Date();
+        
+        // ФІКС №3: Жорстка фіксація локальної дати, щоб не було сірого екрану при вході
+        let currentDate = new Date(); 
         window.currentActivity = "Смотрит Главный экран";
 
         let previousMessageCounts = {};
@@ -462,14 +467,15 @@
             play(500, audioCtx.currentTime); play(700, audioCtx.currentTime + 0.15);
         }
 
-        // --- PRESENCE ---
+        // --- PRESENCE (ФІКС №2: Надійна система статусу онлайн) ---
         let presenceInterval = null;
         async function updatePresence() {
             if(!currentUser) return;
             try {
                 await db.collection('presence').doc(currentUser.email).set({
                     email: currentUser.email, role: isAdmin ? t('role_office') : t('role_warehouse'),
-                    activity: window.currentActivity, lastActiveLocal: Date.now() 
+                    activity: window.currentActivity, 
+                    lastActive: firebase.firestore.FieldValue.serverTimestamp() // Тільки надійний час сервера
                 }, {merge: true});
             } catch(e) {}
         }
@@ -480,11 +486,12 @@
             presenceInterval = setInterval(updatePresence, 60000); 
 
             db.collection('presence').onSnapshot(snap => {
-                let onlineCount = 0; let html = ''; const now = Date.now();
+                let onlineCount = 0; let html = ''; 
                 snap.forEach(doc => {
-                    const d = doc.data();
-                    if(!d.lastActiveLocal) return;
-                    let diff = (now - d.lastActiveLocal) / 1000;
+                    const d = doc.data({ serverTimestamps: 'estimate' }); // Виключає проблему з Null при записі
+                    if(!d.lastActive) return;
+                    
+                    let diff = (Date.now() - d.lastActive.toMillis()) / 1000;
                     if (diff < 0) diff = 0; 
                     if(diff < 150) { 
                         onlineCount++;
@@ -503,18 +510,16 @@
         function togglePresenceModal() { document.getElementById('presence-modal').classList.toggle('hidden'); }
         window.addEventListener('beforeunload', () => { if(currentUser) db.collection('presence').doc(currentUser.email).delete(); });
 
-        // --- КАЛЕНДАР (ФІКС ТАЙМЗОНИ) ---
-        function fixCalendarDate() {
-            const now = new Date();
-            const offset = now.getTimezoneOffset() * 60000;
-            const localISODate = (new Date(now.getTime() - offset)).toISOString().split('T')[0];
-            document.getElementById('date-picker').value = localISODate;
-            currentDate = new Date(localISODate);
+        // --- КАЛЕНДАР (ФІКС №3: Зрізана математика таймзон) ---
+        function getLocalISODate(d) {
+            const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
         function updateDateDisplay() {
-            const todayStr = (new Date(Date.now() - (new Date()).getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-            const pickerVal = document.getElementById('date-picker').value;
+            const todayStr = getLocalISODate(new Date());
+            const pickerVal = getLocalISODate(currentDate);
+            document.getElementById('date-picker').value = pickerVal;
             
             let label = currentDate.toLocaleDateString('ru-RU');
             if (pickerVal === todayStr) {
@@ -528,11 +533,17 @@
 
         function changeDate(offset) { 
             currentDate.setDate(currentDate.getDate() + offset); 
-            const off = currentDate.getTimezoneOffset() * 60000;
-            document.getElementById('date-picker').value = (new Date(currentDate.getTime() - off)).toISOString().split('T')[0];
             updateDateDisplay(); loadDashboard(); 
         }
-        function setDateFromPicker(val) { if (!val) return; currentDate = new Date(val); updateDateDisplay(); loadDashboard(); }
+
+        function setDateFromPicker(val) { 
+            if (!val) return; 
+            const parts = val.split('-');
+            currentDate = new Date();
+            currentDate.setFullYear(parts[0], parts[1] - 1, parts[2]);
+            currentDate.setHours(12, 0, 0, 0); // Захист від зміщення при літньому часі
+            updateDateDisplay(); loadDashboard(); 
+        }
 
         // --- АНАЛІТИКА ---
         function openAnalytics() {
@@ -618,9 +629,10 @@
                 if (isAdmin) { document.getElementById('create-btn').classList.remove('hidden'); document.getElementById('chat-quick-replies').classList.add('hidden'); } 
                 else { document.getElementById('create-btn').classList.add('hidden'); document.getElementById('chat-quick-replies').classList.remove('hidden'); }
 
-                fixCalendarDate(); 
                 translateUI(); 
-                startPresenceTracker(); updateDateDisplay(); loadDashboard();
+                updateDateDisplay(); // Викликаємо одразу чистий локальний час
+                startPresenceTracker(); 
+                loadDashboard();
             } else {
                 currentUser = null; isAdmin = false; translateUI();
                 if(presenceInterval) clearInterval(presenceInterval);
@@ -742,6 +754,8 @@
         function loadDashboard() {
             window.currentActivity = "Смотрит Главный экран"; updatePresence();
             if (unsubscribeManifests) unsubscribeManifests();
+            
+            // Жорстко беремо локальний час початку і кінця поточної дати
             const startOfDay = new Date(currentDate); startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date(currentDate); endOfDay.setHours(23, 59, 59, 999);
 
@@ -762,6 +776,7 @@
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     let docDate = data.createdAt ? data.createdAt.toDate() : new Date();
+                    // Відсікаємо те, що не вписується в нашу обрану локальну добу
                     if (docDate < startOfDay || docDate > endOfDay) return; 
                     
                     itemsShown++;
