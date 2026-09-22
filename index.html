@@ -1,10 +1,14 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="uk">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Склад - Загрузка / Выгрузка</title>
+    <title>Склад Контроль</title>
+    <!-- Підключення Tailwind зі скриптом конфігурації для Нічної теми -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -13,7 +17,6 @@
         @keyframes flashGreen { 0% { background-color: #22c55e; } 100% { background-color: transparent; } }
         @keyframes flashRed { 0% { background-color: #ef4444; } 100% { background-color: transparent; } }
         @keyframes flashOrange { 0% { background-color: #f97316; } 100% { background-color: transparent; } }
-        
         @keyframes urgentBlink {
             0%, 100% { box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.8); border-color: #ef4444; background-color: #fef2f2; transform: scale(1.02); }
             50% { box-shadow: none; border-color: #d1d5db; background-color: #ffffff; transform: scale(1); }
@@ -24,14 +27,8 @@
         .flash-orange { animation: flashOrange 1s ease-out; }
         .urgent-blink { animation: urgentBlink 1.5s infinite; border-width: 4px; }
         
-        /* Класс для полноэкранного режима списка */
         .expanded-list {
-            position: absolute !important;
-            inset: 0 !important;
-            z-index: 40 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            height: 100% !important;
+            position: absolute !important; inset: 0 !important; z-index: 40 !important; width: 100% !important; max-width: 100% !important; height: 100% !important;
         }
 
         #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(239, 68, 68, 0.95); z-index: 50; justify-content: center; align-items: center; flex-direction: column; color: white; }
@@ -47,238 +44,367 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col relative">
+<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 h-screen overflow-hidden flex flex-col relative transition-colors duration-300">
 
-    <!-- Экран входа -->
-    <div id="login-screen" class="absolute inset-0 z-50 bg-gray-100 flex items-center justify-center">
-        <div class="bg-white p-8 rounded-lg shadow-md w-96 mx-4">
-            <h2 class="text-2xl font-bold mb-6 text-center">Вход в систему</h2>
+    <!-- Екран входу -->
+    <div id="login-screen" class="absolute inset-0 z-50 bg-gray-100 dark:bg-gray-900 flex items-center justify-center transition-colors duration-300">
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md w-96 mx-4">
+            <h2 class="text-2xl font-bold mb-6 text-center" data-i18n="login_title">Вхід у систему</h2>
             <div class="mb-4">
-                <label class="block text-sm font-medium mb-1">Email</label>
-                <input type="email" id="email" class="w-full border rounded p-2" placeholder="email@sklad.ru">
+                <label class="block text-sm font-medium mb-1" data-i18n="email">Email</label>
+                <input type="email" id="email" class="w-full border dark:border-gray-600 rounded p-2 dark:bg-gray-700" placeholder="email@sklad.pl">
             </div>
             <div class="mb-6">
-                <label class="block text-sm font-medium mb-1">Пароль</label>
-                <input type="password" id="password" class="w-full border rounded p-2" placeholder="******">
+                <label class="block text-sm font-medium mb-1" data-i18n="password">Пароль</label>
+                <input type="password" id="password" class="w-full border dark:border-gray-600 rounded p-2 dark:bg-gray-700" placeholder="******">
             </div>
-            <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700">Войти</button>
-            <p id="login-error" class="text-red-500 text-sm mt-3 hidden"></p>
+            <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700" data-i18n="login_btn">Увійти</button>
+            <p id="login-error" class="text-red-500 text-sm mt-3 hidden" data-i18n="login_error">Помилка входу!</p>
         </div>
     </div>
 
-    <!-- Верхняя панель -->
-    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center no-print shrink-0 z-20">
-        <div>
-            <h1 class="text-xl font-bold">Склад Контроль</h1>
-            <p id="user-info" class="text-sm text-blue-200"></p>
-        </div>
+    <!-- Верхня панель -->
+    <header class="bg-blue-800 dark:bg-blue-950 text-white p-4 shadow-md flex justify-between items-center no-print shrink-0 z-20">
         <div class="flex items-center gap-3">
-            <!-- Кнопка Аналитики (Только Офис) -->
-            <button id="nav-analytics-btn" onclick="openAnalytics()" class="hidden text-xs md:text-sm bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded-full font-bold shadow transition flex items-center gap-1 border border-purple-400">
-                📊 Аналитика
+            <h1 class="text-lg md:text-xl font-bold">Склад Контроль</h1>
+            <p id="user-info" class="text-xs md:text-sm text-blue-200 hidden md:block"></p>
+        </div>
+        <div class="flex items-center gap-2 md:gap-3">
+            <!-- Перемикач Нічної теми -->
+            <button onclick="toggleTheme()" class="text-lg p-1 rounded-full hover:bg-blue-700 transition" id="theme-icon">🌙</button>
+            
+            <!-- Перемикач мови -->
+            <select id="lang-switcher" onchange="changeLang(this.value)" class="bg-blue-900 text-white text-xs md:text-sm rounded border border-blue-600 px-2 py-1 focus:outline-none">
+                <option value="ua">🇺🇦 UA</option>
+                <option value="pl">🇵🇱 PL</option>
+                <option value="en">🇬🇧 EN</option>
+            </select>
+
+            <button id="nav-analytics-btn" onclick="openAnalytics()" class="text-xs md:text-sm bg-purple-600 hover:bg-purple-500 px-2 md:px-3 py-1 rounded-full font-bold shadow transition flex items-center gap-1 border border-purple-400">
+                📊 <span class="hidden md:inline" data-i18n="analytics">Аналітика</span>
             </button>
             
             <div class="relative">
-                <button onclick="togglePresenceModal()" class="text-xs md:text-sm bg-blue-900 hover:bg-blue-700 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-600 transition shadow">
-                    <span class="animate-pulse">🟢</span> В сети: <span id="online-count-badge" class="font-bold">0</span>
+                <button onclick="togglePresenceModal()" class="text-xs md:text-sm bg-blue-900 hover:bg-blue-700 px-2 md:px-3 py-1 rounded-full flex items-center gap-2 border border-blue-600 transition shadow">
+                    <span class="animate-pulse">🟢</span> <span class="hidden md:inline" data-i18n="online">В мережі:</span> <span id="online-count-badge" class="font-bold">0</span>
                 </button>
-                <div id="presence-modal" class="hidden absolute top-10 right-0 bg-white shadow-2xl border rounded-lg w-64 text-gray-800 p-3 z-50">
-                    <h4 class="font-bold border-b pb-2 mb-2 text-sm flex justify-between">
-                        Активные сейчас
+                <div id="presence-modal" class="hidden absolute top-10 right-0 bg-white dark:bg-gray-800 shadow-2xl border dark:border-gray-600 rounded-lg w-64 text-gray-800 dark:text-gray-100 p-3 z-50">
+                    <h4 class="font-bold border-b dark:border-gray-600 pb-2 mb-2 text-sm flex justify-between">
+                        <span data-i18n="active_now">Активні зараз</span>
                         <button onclick="togglePresenceModal()" class="text-gray-400 hover:text-red-500">✖</button>
                     </h4>
                     <div id="presence-list" class="max-h-60 overflow-y-auto space-y-2"></div>
                 </div>
             </div>
-            <button onclick="logout()" class="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded">Выйти</button>
+            <button onclick="logout()" class="text-xs md:text-sm bg-blue-700 hover:bg-blue-600 px-2 md:px-3 py-1 rounded" data-i18n="logout">Вийти</button>
         </div>
     </header>
 
-    <!-- ПАНЕЛЬ АРХИВА ДАТ (Календарь) -->
-    <div id="date-ribbon" class="bg-white shadow-sm px-4 py-3 flex justify-between items-center no-print shrink-0 border-b z-10 hidden">
-        <button onclick="changeDate(-1)" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-bold text-sm shadow-sm transition">&larr; Пред</button>
+    <!-- ПАНЕЛЬ АРХІВУ ДАТ -->
+    <div id="date-ribbon" class="bg-white dark:bg-gray-800 shadow-sm px-4 py-3 flex justify-between items-center no-print shrink-0 border-b dark:border-gray-700 z-10 hidden">
+        <button onclick="changeDate(-1)" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 font-bold text-sm shadow-sm transition">&larr; <span data-i18n="prev">Попередній</span></button>
         <div class="flex items-center gap-2">
-            <span id="current-date-display" class="font-bold text-lg md:text-xl text-blue-800">Сегодня</span>
-            <input type="date" id="date-picker" onchange="setDateFromPicker(this.value)" class="border rounded px-2 py-1 text-sm bg-gray-50 text-gray-700 cursor-pointer shadow-inner focus:outline-none focus:border-blue-500">
+            <span id="current-date-display" class="font-bold text-lg md:text-xl text-blue-800 dark:text-blue-400">Сьогодні</span>
+            <input type="date" id="date-picker" onchange="setDateFromPicker(this.value)" class="border dark:border-gray-600 rounded px-2 py-1 text-sm bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 cursor-pointer shadow-inner focus:outline-none">
         </div>
-        <button onclick="changeDate(1)" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-bold text-sm shadow-sm transition">След &rarr;</button>
+        <button onclick="changeDate(1)" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 font-bold text-sm shadow-sm transition"><span data-i18n="next">Наступний</span> &rarr;</button>
     </div>
 
-    <!-- Главный экран -->
+    <!-- Головний екран (Дашборд ведомостей) -->
     <div id="dashboard-screen" class="flex-1 overflow-auto p-4 hidden no-print relative">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h2 class="text-2xl font-bold text-gray-700" id="dashboard-title">Ведомости на день</h2>
-            <button id="create-btn" onclick="showCreateForm()" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow-md w-full sm:w-auto transition transform hover:scale-105">
-                + Создать ведомость
+            <h2 class="text-2xl font-bold text-gray-700 dark:text-gray-200" id="dashboard-title" data-i18n="manifests_title">Відомості на день</h2>
+            
+            <button id="create-btn" onclick="showCreateForm()" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow-md w-full sm:w-auto transition transform hover:scale-105" data-i18n="create_btn">
+                + Створити відомість
             </button>
         </div>
         <div id="manifests-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
     </div>
 
-    <!-- ЭКРАН АНАЛИТИКИ (ДАШБОРД) -->
-    <div id="analytics-screen" class="hidden flex-1 overflow-auto p-4 md:p-6 bg-gray-50 no-print relative">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b pb-4">
-            <h2 class="text-2xl md:text-3xl font-bold text-gray-800">📊 Панель руководителя</h2>
-            <button onclick="closeAnalytics()" class="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-full font-bold shadow transition text-sm">← Вернуться к ведомостям</button>
+    <!-- ЕКРАН АНАЛІТИКИ -->
+    <div id="analytics-screen" class="hidden flex-1 overflow-auto p-4 md:p-6 bg-gray-50 dark:bg-gray-900 no-print relative">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b dark:border-gray-700 pb-4">
+            <h2 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-gray-100" data-i18n="analytics_title">📊 Панель аналітики</h2>
+            <button onclick="closeAnalytics()" class="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-full font-bold shadow transition text-sm flex gap-2">
+                &larr; <span data-i18n="back_to_manifests">До відомостей</span>
+            </button>
         </div>
         
-        <!-- Выбор периода -->
         <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
-            <button onclick="setAnalyticsPeriod('today')" id="btn-period-today" class="px-5 py-2 rounded-full font-bold bg-blue-600 text-white shadow transition whitespace-nowrap">Сегодня</button>
-            <button onclick="setAnalyticsPeriod('yesterday')" id="btn-period-yesterday" class="px-5 py-2 rounded-full font-bold bg-white text-gray-700 border shadow-sm transition hover:bg-gray-100 whitespace-nowrap">Вчера</button>
-            <button onclick="setAnalyticsPeriod('week')" id="btn-period-week" class="px-5 py-2 rounded-full font-bold bg-white text-gray-700 border shadow-sm transition hover:bg-gray-100 whitespace-nowrap">7 дней</button>
-            <button onclick="setAnalyticsPeriod('month')" id="btn-period-month" class="px-5 py-2 rounded-full font-bold bg-white text-gray-700 border shadow-sm transition hover:bg-gray-100 whitespace-nowrap">30 дней</button>
+            <button onclick="setAnalyticsPeriod('today')" id="btn-period-today" class="px-5 py-2 rounded-full font-bold bg-blue-600 text-white shadow transition whitespace-nowrap" data-i18n="today">Сьогодні</button>
+            <button onclick="setAnalyticsPeriod('yesterday')" id="btn-period-yesterday" class="px-5 py-2 rounded-full font-bold bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border dark:border-gray-600 shadow-sm transition hover:bg-gray-100 dark:hover:bg-gray-700 whitespace-nowrap" data-i18n="yesterday">Вчора</button>
+            <button onclick="setAnalyticsPeriod('week')" id="btn-period-week" class="px-5 py-2 rounded-full font-bold bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border dark:border-gray-600 shadow-sm transition hover:bg-gray-100 dark:hover:bg-gray-700 whitespace-nowrap" data-i18n="week">7 днів</button>
+            <button onclick="setAnalyticsPeriod('month')" id="btn-period-month" class="px-5 py-2 rounded-full font-bold bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border dark:border-gray-600 shadow-sm transition hover:bg-gray-100 dark:hover:bg-gray-700 whitespace-nowrap" data-i18n="month">30 днів</button>
         </div>
 
-        <!-- 4 Главных показателя -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div class="bg-white p-5 rounded-xl shadow-md border-t-4 border-blue-500">
-                <h4 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Машины</h4>
-                <div class="text-4xl font-black mt-2 text-gray-800" id="stat-cars">0 / 0</div>
-                <div class="text-xs text-gray-400 mt-2 font-bold">Готово / В работе</div>
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-t-4 border-blue-500">
+                <h4 class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider" data-i18n="stat_cars">Машини</h4>
+                <div class="text-4xl font-black mt-2 text-gray-800 dark:text-gray-100" id="stat-cars">0 / 0</div>
+                <div class="text-xs text-gray-400 mt-2 font-bold" data-i18n="stat_cars_sub">Готово / В роботі</div>
             </div>
-            <div class="bg-white p-5 rounded-xl shadow-md border-t-4 border-green-500">
-                <h4 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Паллеты</h4>
-                <div class="text-4xl font-black mt-2 text-gray-800" id="stat-pallets">0</div>
-                <div class="text-xs text-gray-400 mt-2 font-bold">Успешно отсканировано</div>
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-t-4 border-green-500">
+                <h4 class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider" data-i18n="stat_pallets">Палети</h4>
+                <div class="text-4xl font-black mt-2 text-gray-800 dark:text-gray-100" id="stat-pallets">0</div>
+                <div class="text-xs text-gray-400 mt-2 font-bold" data-i18n="stat_pallets_sub">Успішно відскановано</div>
             </div>
-            <div class="bg-white p-5 rounded-xl shadow-md border-t-4 border-purple-500">
-                <h4 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Среднее время</h4>
-                <div class="text-4xl font-black mt-2 text-gray-800" id="stat-time">0 мин</div>
-                <div class="text-xs text-gray-400 mt-2 font-bold">На загрузку одной фуры</div>
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-t-4 border-purple-500">
+                <h4 class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider" data-i18n="stat_time">Середній час</h4>
+                <div class="text-4xl font-black mt-2 text-gray-800 dark:text-gray-100" id="stat-time">0 хв</div>
+                <div class="text-xs text-gray-400 mt-2 font-bold" data-i18n="stat_time_sub">На завантаження однієї фури</div>
             </div>
-            <div class="bg-white p-5 rounded-xl shadow-md border-t-4 border-red-500">
-                <h4 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Контроль качества</h4>
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border-t-4 border-red-500">
+                <h4 class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider" data-i18n="stat_qc">Контроль якості</h4>
                 <div class="text-4xl font-black mt-2 text-red-600" id="stat-errors">0</div>
-                <div class="text-xs text-gray-500 mt-2 font-bold bg-red-50 inline-block px-2 py-1 rounded">Отмен офисом: <span id="stat-cancels">0</span></div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-2 font-bold bg-red-50 dark:bg-red-900/30 inline-block px-2 py-1 rounded"><span data-i18n="stat_cancels_prefix">Скасувань:</span> <span id="stat-cancels">0</span></div>
             </div>
         </div>
 
-        <!-- Списки (Рейтинги) -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
-            <div class="bg-white p-5 rounded-xl shadow-md">
-                <h4 class="font-bold text-gray-800 mb-4 border-b pb-3 text-lg flex items-center gap-2">🏆 Рейтинг (Паллеты)</h4>
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md">
+                <h4 class="font-bold text-gray-800 dark:text-gray-100 mb-4 border-b dark:border-gray-700 pb-3 text-lg flex items-center gap-2">🏆 <span data-i18n="rating_top">Рейтинг (Палети)</span></h4>
                 <ul id="stat-top-users" class="space-y-3"></ul>
             </div>
-            <div class="bg-white p-5 rounded-xl shadow-md">
-                <h4 class="font-bold text-gray-800 mb-4 border-b pb-3 text-lg flex items-center gap-2">⚠️ Антирейтинг (Ошибки сканера)</h4>
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md">
+                <h4 class="font-bold text-gray-800 dark:text-gray-100 mb-4 border-b dark:border-gray-700 pb-3 text-lg flex items-center gap-2">⚠️ <span data-i18n="rating_anti">Антирейтинг (Помилки)</span></h4>
                 <ul id="stat-top-errors" class="space-y-3"></ul>
             </div>
         </div>
     </div>
 
-    <!-- Форма создания / редактирования -->
+    <!-- Модалка Створення -->
     <div id="create-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center no-print p-4">
-        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md md:max-w-xl">
-            <h3 id="modal-title" class="text-xl font-bold mb-4">Новая ведомость</h3>
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md md:max-w-xl">
+            <h3 id="modal-title" class="text-xl font-bold mb-4 dark:text-white" data-i18n="modal_new_title">Нова відомість</h3>
             <div class="flex gap-4 mb-4">
-                <select id="new-manifest-type" class="w-1/2 border rounded p-2 font-bold text-sm bg-gray-50">
-                    <option value="load">🟢 ЗАГРУЗКА АВТО</option>
-                    <option value="unload">🟣 ВЫГРУЗКА ИЗ АВТО</option>
+                <select id="new-manifest-type" class="w-1/2 border dark:border-gray-600 rounded p-2 font-bold text-sm bg-gray-50 dark:bg-gray-700 dark:text-white">
+                    <option value="load" data-i18n="type_load">🟢 ЗАВАНТАЖЕННЯ</option>
+                    <option value="unload" data-i18n="type_unload">🟣 ВИВАНТАЖЕННЯ</option>
                 </select>
-                <input type="text" id="new-car-number" placeholder="Номер авто (АА 1234)" class="w-1/2 border rounded p-2 font-bold text-lg">
+                <input type="text" id="new-car-number" placeholder="АА 1234 ВВ" class="w-1/2 border dark:border-gray-600 rounded p-2 font-bold text-lg dark:bg-gray-700 dark:text-white">
             </div>
-            <label class="block text-sm font-medium mb-1">Скопируйте таблицу из Excel и вставьте сюда:</label>
-            <textarea id="new-manifests-list" rows="6" oninput="updateManifestCount()" placeholder="Вставьте скопированные данные..." class="w-full border rounded p-2 mb-1 font-mono text-xs whitespace-pre"></textarea>
-            <div id="manifest-counter" class="text-green-600 font-bold mb-4 h-6">Распознано: 0 манифестов (0 палет)</div>
+            <label class="block text-sm font-medium mb-1 dark:text-gray-300" data-i18n="modal_paste">Вставте таблицю з Excel сюди:</label>
+            <textarea id="new-manifests-list" rows="6" oninput="updateManifestCount()" class="w-full border dark:border-gray-600 rounded p-2 mb-1 font-mono text-xs whitespace-pre dark:bg-gray-700 dark:text-white"></textarea>
+            <div id="manifest-counter" class="text-green-600 font-bold mb-4 h-6" data-i18n="modal_counter_empty">Номери поки не знайдені...</div>
             <div class="flex justify-end gap-2">
-                <button onclick="hideCreateForm()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 font-bold">Отмена</button>
-                <button onclick="saveManifest()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold shadow-md">Сохранить</button>
+                <button onclick="hideCreateForm()" class="px-4 py-2 bg-gray-300 dark:bg-gray-600 dark:text-white rounded hover:bg-gray-400 font-bold" data-i18n="cancel">Скасувати</button>
+                <button onclick="saveManifest()" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold shadow-md" data-i18n="save">Зберегти</button>
             </div>
         </div>
     </div>
 
-    <!-- Экран сканирования -->
-    <div id="scan-screen" class="hidden flex-1 flex flex-col no-print bg-white overflow-hidden relative">
+    <!-- Екран Сканера -->
+    <div id="scan-screen" class="hidden flex-1 flex flex-col no-print bg-white dark:bg-gray-900 overflow-hidden relative">
         <div id="sound-unlock-overlay" class="flex">
-            <h2 class="text-3xl font-bold mb-8 text-center px-4">Режим сканирования</h2>
-            <button onclick="unlockAudio()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-6 px-12 rounded-full text-2xl shadow-2xl animate-pulse">
-                ВКЛЮЧИТЬ ЗВУК И НАЧАТЬ
+            <h2 class="text-3xl font-bold mb-8 text-center px-4" data-i18n="scan_mode">Режим сканування</h2>
+            <button onclick="unlockAudio()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-6 px-12 rounded-full text-2xl shadow-2xl animate-pulse" data-i18n="unlock_sound">
+                УВІМКНУТИ ЗВУК ТА ПОЧАТИ
             </button>
-            <p class="mt-6 text-blue-200 text-center px-4">Внимание: Убедитесь, что на телефоне НЕ включен беззвучный режим!</p>
+            <p class="mt-6 text-blue-200 text-center px-4" data-i18n="unlock_warn">Увага: Переконайтеся, що на телефоні НЕ увімкнений беззвучний режим!</p>
         </div>
 
-        <div class="bg-gray-200 p-4 flex justify-between items-center border-b shrink-0 z-20 shadow-sm">
+        <div class="bg-gray-200 dark:bg-gray-800 p-4 flex justify-between items-center border-b dark:border-gray-700 shrink-0 z-20 shadow-sm">
             <div>
-                <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded font-bold mr-2 text-sm">← Назад</button>
-                <span class="text-lg md:text-xl font-bold" id="scan-car-number">АВТОМОБИЛЬ</span>
+                <button onclick="closeScanner()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded font-bold mr-2 text-sm">&larr; <span data-i18n="back">Назад</span></button>
+                <span class="text-lg md:text-xl font-bold dark:text-white" id="scan-car-number">АВТОМОБІЛЬ</span>
                 <span id="scan-doc-type" class="ml-2 text-sm px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block"></span>
             </div>
             <div class="flex gap-2 items-center">
                 <div class="text-right mr-2">
-                    <div class="text-xl md:text-2xl font-bold text-blue-600"><span id="scan-count">0</span> / <span id="scan-total">0</span></div>
-                    <div class="text-xs text-gray-500 font-bold" id="scan-action-word">обработано</div>
+                    <div class="text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400"><span id="scan-count">0</span> / <span id="scan-total">0</span></div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 font-bold" id="scan-action-word">оброблено</div>
                 </div>
-                <button onclick="generatePDF()" class="bg-blue-600 text-white px-3 py-2 rounded font-bold text-sm shadow">Акт</button>
+                <button onclick="generatePDF()" class="bg-blue-600 text-white px-3 py-2 rounded font-bold text-sm shadow">PDF Акт</button>
             </div>
         </div>
 
         <div id="scan-alert-bar" class="hidden bg-red-600 text-white p-3 text-center font-bold text-sm md:text-base animate-pulse shrink-0 shadow-md z-10 border-b-4 border-red-800"></div>
 
         <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-            
-            <div id="scan-flash-area" class="flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b md:border-b-0 md:border-r overflow-y-auto">
-                <input type="text" id="scanner-input" autocomplete="off" class="w-full max-w-2xl text-center text-2xl md:text-4xl font-mono border-4 border-blue-400 rounded-lg p-4 md:p-6 shadow-inner focus:outline-none focus:border-blue-600 focus:bg-blue-50" placeholder="Сканируйте штрих-код...">
-                <button onclick="document.getElementById('scanner-input').focus()" class="mt-4 text-sm text-blue-500 underline font-bold">Вернуть фокус сканеру</button>
+            <div id="scan-flash-area" class="flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b dark:border-gray-700 md:border-b-0 md:border-r overflow-y-auto">
+                <input type="text" id="scanner-input" autocomplete="off" class="w-full max-w-2xl text-center text-2xl md:text-4xl font-mono border-4 border-blue-400 dark:border-blue-600 rounded-lg p-4 md:p-6 shadow-inner focus:outline-none focus:border-blue-600 focus:bg-blue-50 dark:bg-gray-800 dark:text-white dark:focus:bg-gray-700" placeholder="Скануйте штрих-код...">
+                <button onclick="document.getElementById('scanner-input').focus()" class="mt-4 text-sm text-blue-500 dark:text-blue-400 underline font-bold" data-i18n="focus_scanner">Повернути фокус сканеру</button>
                 <div id="scan-last-result" class="mt-6 text-center h-24 flex flex-col justify-center"></div>
             </div>
 
-            <!-- Обновленная зона списка с кнопкой Развернуть -->
-            <div id="scan-list-area" class="w-full md:w-1/2 lg:w-1/3 bg-gray-50 flex flex-col shrink-0 h-1/2 md:h-full relative transition-all duration-300">
-                <button id="toggle-list-btn" onclick="toggleListMode()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold p-3 text-center shadow-sm z-10 w-full border-b flex justify-center items-center gap-2 transition-colors text-sm">
-                    🔍 Развернуть список для сверки
+            <div id="scan-list-area" class="w-full md:w-1/2 lg:w-1/3 bg-gray-50 dark:bg-gray-900 flex flex-col shrink-0 h-1/2 md:h-full relative transition-all duration-300">
+                <button id="toggle-list-btn" onclick="toggleListMode()" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold p-3 text-center shadow-sm z-10 w-full border-b dark:border-gray-600 flex justify-center items-center gap-2 transition-colors text-sm">
+                    🔍 <span data-i18n="expand_list">Розгорнути список для звірки</span>
                 </button>
-                <div class="flex-1 overflow-y-auto p-2 bg-white">
+                <div class="flex-1 overflow-y-auto p-2 bg-white dark:bg-gray-800">
                     <ul id="manifest-items-list" class="space-y-2"></ul>
                 </div>
                 
-                <!-- ПЛАВАЮЩАЯ КНОПКА ЧАТА -->
-                <button onclick="openChatPanel()" class="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full h-14 w-14 flex items-center justify-center shadow-xl z-20 text-2xl transition transform hover:scale-110 border-2 border-white">
+                <button onclick="openChatPanel()" class="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full h-14 w-14 flex items-center justify-center shadow-xl z-20 text-2xl transition transform hover:scale-110 border-2 border-white dark:border-gray-800">
                     💬
-                    <span id="scan-chat-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 border-2 border-white flex items-center justify-center">!</span>
+                    <span id="scan-chat-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 border-2 border-white dark:border-gray-800 flex items-center justify-center">!</span>
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ВЫЕЗЖАЮЩАЯ ПАНЕЛЬ ЧАТА -->
-    <div id="chat-panel" class="fixed right-0 top-0 h-full w-full md:w-96 bg-gray-50 shadow-2xl transform translate-x-full transition-transform z-50 flex flex-col border-l border-gray-300">
-        <div class="bg-blue-800 text-white p-4 flex justify-between items-center shrink-0 shadow">
-            <h3 class="font-bold flex items-center gap-2">💬 Чат: <span id="chat-title-car"></span></h3>
+    <!-- ВИТЯЖНА ПАНЕЛЬ ЧАТУ -->
+    <div id="chat-panel" class="fixed right-0 top-0 h-full w-full md:w-96 bg-gray-50 dark:bg-gray-900 shadow-2xl transform translate-x-full transition-transform z-50 flex flex-col border-l border-gray-300 dark:border-gray-700">
+        <div class="bg-blue-800 dark:bg-blue-950 text-white p-4 flex justify-between items-center shrink-0 shadow">
+            <h3 class="font-bold flex items-center gap-2">💬 <span data-i18n="chat_title">Чат</span>: <span id="chat-title-car"></span></h3>
             <button onclick="closeChatPanel()" class="text-white hover:text-gray-300 text-3xl font-bold leading-none">&times;</button>
         </div>
-        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white"></div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white dark:bg-gray-800"></div>
         
-        <div id="chat-quick-replies" class="p-2 grid grid-cols-2 gap-2 bg-gray-200 border-t shrink-0">
-            <button onclick="sendChatMessage('📦 Груз поврежден')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">📦 Груз поврежден</button>
-            <button onclick="sendChatMessage('🛑 Нет места в авто')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">🛑 Нет места в авто</button>
-            <button onclick="sendChatMessage('❓ Штрих-код не читается')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">❓ Штрих-код не читается</button>
-            <button onclick="sendChatMessage('✅ Обработка завершена')" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-bold py-2 rounded shadow-sm">✅ Работа завершена</button>
+        <div id="chat-quick-replies" class="p-2 grid grid-cols-2 gap-2 bg-gray-200 dark:bg-gray-700 border-t dark:border-gray-600 shrink-0">
+            <button onclick="sendQuickChat('chat_q1')" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-white text-xs font-bold py-2 rounded shadow-sm" data-i18n="chat_q1">📦 Вантаж пошкоджено</button>
+            <button onclick="sendQuickChat('chat_q2')" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-white text-xs font-bold py-2 rounded shadow-sm" data-i18n="chat_q2">🛑 Немає місця в авто</button>
+            <button onclick="sendQuickChat('chat_q3')" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-white text-xs font-bold py-2 rounded shadow-sm" data-i18n="chat_q3">❓ Штрих-код не читається</button>
+            <button onclick="sendQuickChat('chat_q4')" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-white text-xs font-bold py-2 rounded shadow-sm" data-i18n="chat_q4">✅ Обробку завершено</button>
         </div>
 
-        <div class="p-3 border-t bg-gray-100 flex gap-2 shrink-0">
-            <input type="text" id="chat-input" class="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-blue-500 shadow-inner" placeholder="Сообщение...">
+        <div class="p-3 border-t dark:border-gray-600 bg-gray-100 dark:bg-gray-800 flex gap-2 shrink-0">
+            <input type="text" id="chat-input" class="flex-1 border border-gray-300 dark:border-gray-600 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-blue-500 dark:bg-gray-700 dark:text-white shadow-inner" placeholder="...">
             <button onclick="sendChatMessage()" class="bg-blue-600 hover:bg-blue-700 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold shadow transition">➤</button>
         </div>
     </div>
 
+    <!-- ЕКРАН ПОМИЛКИ -->
     <div id="error-overlay">
-        <h1 class="text-4xl md:text-6xl font-bold mb-4">ОШИБКА!</h1>
-        <p class="text-xl md:text-2xl mb-8 text-center px-4" id="error-message">Неправильный номер</p>
-        <button onclick="closeErrorOverlay()" class="bg-white text-red-600 font-bold py-4 px-12 rounded-full text-xl md:text-2xl hover:bg-gray-100 shadow-lg">ЗАКРЫТЬ</button>
+        <h1 class="text-4xl md:text-6xl font-bold mb-4" data-i18n="error_big">ПОМИЛКА!</h1>
+        <p class="text-xl md:text-2xl mb-8 text-center px-4" id="error-message">Неправильний номер</p>
+        <button onclick="closeErrorOverlay()" class="bg-white text-red-600 font-bold py-4 px-12 rounded-full text-xl md:text-2xl hover:bg-gray-100 shadow-lg" data-i18n="close">ЗАКРИТИ</button>
     </div>
 
     <div id="print-area" class="hidden bg-white"></div>
 
     <script>
+        // =========================================================================
+        // ПЕРЕКЛАДИ (Багатомовність)
+        // =========================================================================
+        const dict = {
+            ua: {
+                login_title: 'Вхід у систему', email: 'Електронна пошта', password: 'Пароль', login_btn: 'Увійти', login_error: 'Помилка входу!',
+                analytics: 'Аналітика', online: 'В мережі:', active_now: 'Активні зараз', logout: 'Вийти',
+                prev: 'Попередній', next: 'Наступний', manifests_title: 'Відомості на день', create_btn: '+ Створити відомість',
+                analytics_title: '📊 Панель аналітики', back_to_manifests: 'До відомостей', today: 'Сьогодні', yesterday: 'Вчора', week: '7 днів', month: '30 днів',
+                stat_cars: 'Машини', stat_cars_sub: 'Готово / В роботі', stat_pallets: 'Палети', stat_pallets_sub: 'Успішно відскановано', stat_time: 'Середній час', stat_time_sub: 'На завантаження фури', stat_qc: 'Контроль якості', stat_cancels_prefix: 'Скасувань:',
+                rating_top: 'Рейтинг (Палети)', rating_anti: 'Антирейтинг (Помилки)',
+                modal_new_title: 'Нова відомість', type_load: '🟢 ЗАВАНТАЖЕННЯ', type_unload: '🟣 ВИВАНТАЖЕННЯ', modal_paste: 'Вставте таблицю з Excel сюди:', modal_counter_empty: 'Номери поки не знайдені...', cancel: 'Скасувати', save: 'Зберегти',
+                scan_mode: 'Режим сканування', unlock_sound: 'УВІМКНУТИ ЗВУК ТА ПОЧАТИ', unlock_warn: 'Увага: Переконайтеся, що на телефоні НЕ увімкнений беззвучний режим!',
+                back: 'Назад', focus_scanner: 'Повернути фокус сканеру', expand_list: 'Розгорнути список для звірки', collapse_list: 'ЗАВЕРШИТИ ЗВІРКУ (До сканеру)',
+                chat_title: 'Чат', chat_q1: '📦 Вантаж пошкоджено', chat_q2: '🛑 Немає місця в авто', chat_q3: '❓ Штрих-код не читається', chat_q4: '✅ Обробку завершено',
+                error_big: 'ПОМИЛКА!', close: 'ЗАКРИТИ', 
+                badge_load: 'ЗАВАНТАЖЕННЯ', badge_unload: 'ВИВАНТАЖЕННЯ', badge_changed: '⚠️ ЗМІНЕНО',
+                word_loaded: 'завантажено', word_unloaded: 'вивантажено',
+                err_repeat: 'ВЖЕ ОБРОБЛЕНО!', err_alien: 'ЧУЖИЙ ВАНТАЖ!',
+                flash_return: 'ПОВЕРНЕННЯ:', flash_left_return: 'Залишилось повернути:', flash_done: 'ГОТОВО', flash_process: 'В ПРОЦЕСІ', flash_weight: 'Вага (B/N):',
+                alert_return: '⚠️ УВАГА, ЗМІНИ! ТРЕБА ПОВЕРНУТИ:', role_office: 'Офіс', role_warehouse: 'Склад',
+                pdf_act: 'АКТ', pdf_car: 'Автомобіль:', pdf_created: 'Створено (Офіс):', pdf_author: 'Автор:', pdf_last_scan: 'Останній скан:', pdf_time: 'Час обробки:', pdf_total: 'Підсумок:', pdf_places: 'місць',
+                pdf_th1: '№', pdf_th2: 'Код', pdf_th3: 'Місця', pdf_th4: 'Brutto', pdf_th5: 'Netto', pdf_th6: 'PCS', pdf_th7: 'Статус', pdf_th8: 'Час скану',
+                pdf_s_err: '⚠️ ПОМИЛКА (ПОВЕРНУТИ)', pdf_s_part: 'ЧАСТКОВО', pdf_s_wait: 'ОЧІКУЄ',
+                pdf_hist: 'Історія змін (Офіс):', pdf_err_hist: 'Помилкові сканування (Зайві номери):',
+                pdf_sign1: 'Здав (Склад): _______________________', pdf_sign2: 'Прийняв (Водій): _______________________',
+                time_min: 'хв', time_h: 'год', time_sec: 'сек', empty_stats: 'Немає даних за цей період'
+            },
+            pl: {
+                login_title: 'Logowanie', email: 'Adres e-mail', password: 'Hasło', login_btn: 'Zaloguj się', login_error: 'Błąd logowania!',
+                analytics: 'Analityka', online: 'Dostępni:', active_now: 'Aktywni teraz', logout: 'Wyloguj',
+                prev: 'Poprzedni', next: 'Następny', manifests_title: 'Listy na dziś', create_btn: '+ Utwórz listę',
+                analytics_title: '📊 Panel analityczny', back_to_manifests: 'Do list', today: 'Dzisiaj', yesterday: 'Wczoraj', week: '7 dni', month: '30 dni',
+                stat_cars: 'Pojazdy', stat_cars_sub: 'Gotowe / W pracy', stat_pallets: 'Palety', stat_pallets_sub: 'Zeskanowane pomyślnie', stat_time: 'Średni czas', stat_time_sub: 'Na załadunek', stat_qc: 'Kontrola jakości', stat_cancels_prefix: 'Anulacje:',
+                rating_top: 'Ranking (Palety)', rating_anti: 'Anty-ranking (Błędy)',
+                modal_new_title: 'Nowa lista', type_load: '🟢 ZAŁADUNEK', type_unload: '🟣 ROZŁADUNEK', modal_paste: 'Wklej tabelę z Excela:', modal_counter_empty: 'Brak numerów...', cancel: 'Anuluj', save: 'Zapisz',
+                scan_mode: 'Tryb skanowania', unlock_sound: 'WŁĄCZ DŹWIĘK I ROZPOCZNIJ', unlock_warn: 'Uwaga: Upewnij się, że telefon NIE jest wyciszony!',
+                back: 'Wróć', focus_scanner: 'Przywróć fokus na skaner', expand_list: 'Rozwiń listę do weryfikacji', collapse_list: 'ZAKOŃCZ WERYFIKACJĘ (Powrót)',
+                chat_title: 'Czat', chat_q1: '📦 Towar uszkodzony', chat_q2: '🛑 Brak miejsca', chat_q3: '❓ Kod nieczytelny', chat_q4: '✅ Gotowe',
+                error_big: 'BŁĄD!', close: 'ZAMKNIJ',
+                badge_load: 'ZAŁADUNEK', badge_unload: 'ROZŁADUNEK', badge_changed: '⚠️ ZMIENIONO',
+                word_loaded: 'załadowano', word_unloaded: 'rozładowano',
+                err_repeat: 'JUŻ PRZETWORZONO!', err_alien: 'OBCY TOWAR!',
+                flash_return: 'ZWROT:', flash_left_return: 'Pozostało do zwrotu:', flash_done: 'GOTOWE', flash_process: 'W TRAKCIE', flash_weight: 'Waga (B/N):',
+                alert_return: '⚠️ UWAGA, ZMIANY! NALEŻY ZWRÓCIĆ:', role_office: 'Biuro', role_warehouse: 'Magazyn',
+                pdf_act: 'AKT', pdf_car: 'Pojazd:', pdf_created: 'Utworzono (Biuro):', pdf_author: 'Autor:', pdf_last_scan: 'Ostatni skan:', pdf_time: 'Czas przetwarzania:', pdf_total: 'Podsumowanie:', pdf_places: 'miejsc',
+                pdf_th1: 'Nr', pdf_th2: 'Kod', pdf_th3: 'Miejsca', pdf_th4: 'Brutto', pdf_th5: 'Netto', pdf_th6: 'Sztuki', pdf_th7: 'Status', pdf_th8: 'Czas skanu',
+                pdf_s_err: '⚠️ BŁĄD (ZWRÓCIĆ)', pdf_s_part: 'CZĘŚCIOWO', pdf_s_wait: 'OCZEKUJE',
+                pdf_hist: 'Historia zmian (Biuro):', pdf_err_hist: 'Błędne skanowania (Złe kody):',
+                pdf_sign1: 'Przekazał (Magazyn): _______________________', pdf_sign2: 'Odebrał (Kierowca): _______________________',
+                time_min: 'min', time_h: 'godz', time_sec: 'sek', empty_stats: 'Brak danych za ten okres'
+            },
+            en: {
+                login_title: 'Login', email: 'Email', password: 'Password', login_btn: 'Sign In', login_error: 'Login error!',
+                analytics: 'Analytics', online: 'Online:', active_now: 'Active Now', logout: 'Logout',
+                prev: 'Previous', next: 'Next', manifests_title: 'Daily Manifests', create_btn: '+ Create Manifest',
+                analytics_title: '📊 Analytics Dashboard', back_to_manifests: 'Back to Manifests', today: 'Today', yesterday: 'Yesterday', week: '7 days', month: '30 days',
+                stat_cars: 'Vehicles', stat_cars_sub: 'Done / In progress', stat_pallets: 'Pallets', stat_pallets_sub: 'Successfully scanned', stat_time: 'Avg Time', stat_time_sub: 'Per vehicle load', stat_qc: 'Quality Control', stat_cancels_prefix: 'Cancellations:',
+                rating_top: 'Top Performers (Pallets)', rating_anti: 'Anti-rating (Errors)',
+                modal_new_title: 'New Manifest', type_load: '🟢 LOAD', type_unload: '🟣 UNLOAD', modal_paste: 'Paste Excel table here:', modal_counter_empty: 'No numbers found...', cancel: 'Cancel', save: 'Save',
+                scan_mode: 'Scanning Mode', unlock_sound: 'ENABLE SOUND & START', unlock_warn: 'Warning: Ensure your phone is NOT on silent mode!',
+                back: 'Back', focus_scanner: 'Return focus to scanner', expand_list: 'Expand list for checking', collapse_list: 'FINISH CHECKING (To Scanner)',
+                chat_title: 'Chat', chat_q1: '📦 Cargo damaged', chat_q2: '🛑 No space in car', chat_q3: '❓ Barcode unreadable', chat_q4: '✅ Processing done',
+                error_big: 'ERROR!', close: 'CLOSE',
+                badge_load: 'LOAD', badge_unload: 'UNLOAD', badge_changed: '⚠️ CHANGED',
+                word_loaded: 'loaded', word_unloaded: 'unloaded',
+                err_repeat: 'ALREADY SCANNED!', err_alien: 'WRONG CARGO!',
+                flash_return: 'RETURN:', flash_left_return: 'Left to return:', flash_done: 'DONE', flash_process: 'IN PROGRESS', flash_weight: 'Weight (B/N):',
+                alert_return: '⚠️ ATTENTION, CHANGES! MUST RETURN:', role_office: 'Office', role_warehouse: 'Warehouse',
+                pdf_act: 'ACT', pdf_car: 'Vehicle:', pdf_created: 'Created (Office):', pdf_author: 'Author:', pdf_last_scan: 'Last scan:', pdf_time: 'Processing time:', pdf_total: 'Total:', pdf_places: 'places',
+                pdf_th1: 'No.', pdf_th2: 'Code', pdf_th3: 'Places', pdf_th4: 'Gross', pdf_th5: 'Net', pdf_th6: 'PCS', pdf_th7: 'Status', pdf_th8: 'Scan Time',
+                pdf_s_err: '⚠️ ERROR (RETURN)', pdf_s_part: 'PARTIAL', pdf_s_wait: 'PENDING',
+                pdf_hist: 'Change History (Office):', pdf_err_hist: 'Error History (Wrong codes):',
+                pdf_sign1: 'Handed over (Warehouse): ___________________', pdf_sign2: 'Accepted (Driver): ___________________',
+                time_min: 'min', time_h: 'h', time_sec: 'sec', empty_stats: 'No data for this period'
+            }
+        };
+
+        let currentLang = localStorage.getItem('app_lang') || 'ua';
+        document.getElementById('lang-switcher').value = currentLang;
+
+        function t(key) { return dict[currentLang][key] || key; }
+
+        function translateUI() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (dict[currentLang][key]) {
+                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = dict[currentLang][key];
+                    else el.innerHTML = dict[currentLang][key];
+                }
+            });
+            // Update dynamic parts if loaded
+            updateManifestCount();
+            if (currentScanId && isListExpanded) toggleListMode(true); // refresh expand button text
+        }
+
+        function changeLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('app_lang', lang);
+            translateUI();
+            if(!document.getElementById('dashboard-screen').classList.contains('hidden')) loadDashboard();
+            if(!document.getElementById('analytics-screen').classList.contains('hidden')) loadAnalyticsData();
+        }
+
+        // =========================================================================
+        // ТЕМА (Нічна/Світла)
+        // =========================================================================
+        let isDarkMode = localStorage.getItem('app_theme') === 'dark';
+        if (isDarkMode) document.documentElement.classList.add('dark');
+        updateThemeIcon();
+
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            if (isDarkMode) {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('app_theme', 'dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('app_theme', 'light');
+            }
+            updateThemeIcon();
+        }
+        function updateThemeIcon() { document.getElementById('theme-icon').innerText = isDarkMode ? '☀️' : '🌙'; }
+
+        // =========================================================================
+        // ДОСТУП ТА FIREBASE
+        // =========================================================================
         const ADMIN_EMAILS = [
-            'skypochka.v@novapost.pl',
-            'mazuryk.o@novapost.pl',
-            'herasymov.d@novapost.pl',
-            'shelemon.a@novapost.pl',
-            'kyzhlai.o@novapost.pl',
-            'yeremenko.m@novapost.pl',
-            'kryvonozhkin.o@novapost.pl'
+            'skypochka.v@novapost.pl', 'mazuryk.o@novapost.pl', 'herasymov.d@novapost.pl',
+            'shelemon.a@novapost.pl', 'kyzhlai.o@novapost.pl', 'yeremenko.m@novapost.pl', 'kryvonozhkin.o@novapost.pl'
         ]; 
         
         let isAdmin = false;
@@ -310,31 +436,18 @@
         let editingManifestId = null;
         let activeChatManifestId = null;
         
-        // --- АУДИО ---
+        // --- АУДІО ---
         let audioCtx = null;
         document.addEventListener('click', () => {
-            if (!audioCtx) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioCtx = new AudioContext();
-            }
+            if (!audioCtx) { const AudioContext = window.AudioContext || window.webkitAudioContext; audioCtx = new AudioContext(); }
             if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
         }, { once: true });
         
         function unlockAudio() {
-            if (!audioCtx) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioCtx = new AudioContext();
-            }
+            if (!audioCtx) { const AudioContext = window.AudioContext || window.webkitAudioContext; audioCtx = new AudioContext(); }
             if (audioCtx.state === 'suspended') audioCtx.resume();
-            
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            gain.gain.value = 0; 
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(0);
-            osc.stop(audioCtx.currentTime + 0.1);
-
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            gain.gain.value = 0; osc.connect(gain); gain.connect(audioCtx.destination); osc.start(0); osc.stop(audioCtx.currentTime + 0.1);
             document.getElementById('sound-unlock-overlay').style.display = 'none';
             document.getElementById('scanner-input').focus();
         }
@@ -342,17 +455,11 @@
         function playTone(freq, type, duration, vol = 1) {
             if(!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-            gain.gain.setValueAtTime(vol, audioCtx.currentTime + duration - 0.05);
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime); gain.gain.setValueAtTime(vol, audioCtx.currentTime + duration - 0.05);
             gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + duration);
+            osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration);
         }
 
         function playSuccessSound() { playTone(1200, 'square', 0.15, 1); setTimeout(() => playTone(1800, 'square', 0.25, 1), 200); }
@@ -361,17 +468,11 @@
             if(!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const play = (freq, startTime) => {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.value = freq;
-                gain.gain.setValueAtTime(0, startTime);
-                gain.gain.linearRampToValueAtTime(0.5, startTime + 0.02);
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, startTime); gain.gain.linearRampToValueAtTime(0.5, startTime + 0.02);
                 gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start(startTime);
-                osc.stop(startTime + 0.15);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start(startTime); osc.stop(startTime + 0.15);
             };
             play(500, audioCtx.currentTime); play(700, audioCtx.currentTime + 0.15);
         }
@@ -382,7 +483,7 @@
             if(!currentUser) return;
             try {
                 await db.collection('presence').doc(currentUser.email).set({
-                    email: currentUser.email, role: isAdmin ? 'Офис' : 'Склад',
+                    email: currentUser.email, role: isAdmin ? t('role_office') : t('role_warehouse'),
                     activity: window.currentActivity, lastActive: firebase.firestore.FieldValue.serverTimestamp()
                 }, {merge: true});
             } catch(e) {}
@@ -402,31 +503,31 @@
                     if (diff < 0) diff = 0; 
                     if(diff < 300) {
                         onlineCount++;
-                        const roleColor = d.role === 'Офис' ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-800';
+                        const roleColor = d.role === t('role_office') ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200';
                         html += `
-                            <div class="border-b py-2 last:border-0">
+                            <div class="border-b dark:border-gray-600 py-2 last:border-0">
                                 <div class="flex items-center gap-1 text-sm"><span class="text-green-500 text-xs">🟢</span> <span class="font-bold truncate">${d.email.split('@')[0]}</span><span class="text-[10px] px-1 rounded font-bold ${roleColor}">${d.role}</span></div>
-                                <div class="text-xs text-gray-500 ml-4 truncate" title="${d.activity}">${d.activity}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400 ml-4 truncate" title="${d.activity}">${d.activity}</div>
                             </div>`;
                     }
                 });
                 document.getElementById('online-count-badge').innerText = onlineCount;
-                document.getElementById('presence-list').innerHTML = html || '<div class="text-sm text-gray-500">Нет активных</div>';
+                document.getElementById('presence-list').innerHTML = html || `<div class="text-sm text-gray-500">${t('empty_stats')}</div>`;
             });
         }
 
         function togglePresenceModal() { document.getElementById('presence-modal').classList.toggle('hidden'); }
         window.addEventListener('beforeunload', () => { if(currentUser) db.collection('presence').doc(currentUser.email).delete(); });
 
-        // --- КАЛЕНДАРЬ ---
+        // --- КАЛЕНДАР ---
         function updateDateDisplay() {
             const today = new Date();
             let label = currentDate.toLocaleDateString('ru-RU');
             if (currentDate.toDateString() === today.toDateString()) {
-                label = "СЕГОДНЯ (" + label + ")";
-                document.getElementById('current-date-display').className = "font-bold text-lg md:text-xl text-green-700";
+                label = `${t('today').toUpperCase()} (${label})`;
+                document.getElementById('current-date-display').className = "font-bold text-lg md:text-xl text-green-700 dark:text-green-500";
             } else {
-                document.getElementById('current-date-display').className = "font-bold text-lg md:text-xl text-blue-800";
+                document.getElementById('current-date-display').className = "font-bold text-lg md:text-xl text-blue-800 dark:text-blue-400";
             }
             document.getElementById('current-date-display').innerText = label;
             document.getElementById('date-picker').value = currentDate.toISOString().split('T')[0];
@@ -435,13 +536,13 @@
         function changeDate(offset) { currentDate.setDate(currentDate.getDate() + offset); updateDateDisplay(); loadDashboard(); }
         function setDateFromPicker(val) { if (!val) return; currentDate = new Date(val); updateDateDisplay(); loadDashboard(); }
 
-        // --- АНАЛИТИКА ---
+        // --- АНАЛІТИКА ---
         function openAnalytics() {
             document.getElementById('dashboard-screen').classList.add('hidden');
             document.getElementById('date-ribbon').classList.add('hidden');
             document.getElementById('scan-screen').classList.add('hidden');
             document.getElementById('analytics-screen').classList.remove('hidden');
-            window.currentActivity = "Смотрит Аналитику";
+            window.currentActivity = t('analytics');
             updatePresence();
             loadAnalyticsData();
         }
@@ -460,7 +561,7 @@
             ['today', 'yesterday', 'week', 'month'].forEach(p => {
                 const btn = document.getElementById('btn-period-' + p);
                 if(p === period) btn.className = "px-5 py-2 rounded-full font-bold bg-blue-600 text-white shadow transition whitespace-nowrap";
-                else btn.className = "px-5 py-2 rounded-full font-bold bg-white text-gray-700 border shadow-sm transition hover:bg-gray-100 whitespace-nowrap";
+                else btn.className = "px-5 py-2 rounded-full font-bold bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border dark:border-gray-600 shadow-sm transition hover:bg-gray-100 dark:hover:bg-gray-700 whitespace-nowrap";
             });
             loadAnalyticsData();
         }
@@ -468,28 +569,15 @@
         function loadAnalyticsData() {
             if(unsubscribeAnalytics) unsubscribeAnalytics();
 
-            let startDate = new Date();
-            startDate.setHours(0,0,0,0);
-            let endDate = new Date();
-            endDate.setHours(23,59,59,999);
+            let startDate = new Date(); startDate.setHours(0,0,0,0);
+            let endDate = new Date(); endDate.setHours(23,59,59,999);
 
-            if (currentAnalyticsPeriod === 'yesterday') {
-                startDate.setDate(startDate.getDate() - 1);
-                endDate.setDate(endDate.getDate() - 1);
-            } else if (currentAnalyticsPeriod === 'week') {
-                startDate.setDate(startDate.getDate() - 7);
-            } else if (currentAnalyticsPeriod === 'month') {
-                startDate.setDate(startDate.getDate() - 30);
-            }
+            if (currentAnalyticsPeriod === 'yesterday') { startDate.setDate(startDate.getDate() - 1); endDate.setDate(endDate.getDate() - 1); } 
+            else if (currentAnalyticsPeriod === 'week') { startDate.setDate(startDate.getDate() - 7); } 
+            else if (currentAnalyticsPeriod === 'month') { startDate.setDate(startDate.getDate() - 30); }
 
             unsubscribeAnalytics = db.collection('manifests').orderBy('createdAt', 'desc').onSnapshot(snap => {
-                let carsTotal = 0, carsDone = 0;
-                let palletsScanned = 0;
-                let durations = [];
-                let userScans = {};
-                let userErrors = {};
-                let cancels = 0;
-                let errorsCount = 0;
+                let carsTotal = 0, carsDone = 0, palletsScanned = 0, durations = [], userScans = {}, userErrors = {}, cancels = 0, errorsCount = 0;
 
                 snap.forEach(doc => {
                     const data = doc.data();
@@ -497,39 +585,24 @@
                     if (dt < startDate || dt > endDate) return;
 
                     carsTotal++;
-                    let cPlaces = 0, cScanned = 0;
-                    let lastScanTime = null;
+                    let cPlaces = 0, cScanned = 0, lastScanTime = null;
 
                     data.items.forEach(i => {
                         if (i.status === 'removed') return;
-                        let t = i.totalPlaces || 1;
-                        let s = i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? t : 0);
-                        
+                        let t = i.totalPlaces || 1; let s = i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? t : 0);
                         cPlaces += t;
                         if (!i.isCancelled) {
-                            cScanned += s;
-                            palletsScanned += s;
+                            cScanned += s; palletsScanned += s;
                             if (s > 0 && i.scannedBy) userScans[i.scannedBy] = (userScans[i.scannedBy] || 0) + s;
-                        } else {
-                            if (s > 0) cancels++;
-                        }
+                        } else { if (s > 0) cancels++; }
 
-                        if (i.scannedAt && !i.isCancelled) {
-                            let scanDt = new Date(i.scannedAt);
-                            if (!lastScanTime || scanDt > lastScanTime) lastScanTime = scanDt;
-                        }
+                        if (i.scannedAt && !i.isCancelled) { let scanDt = new Date(i.scannedAt); if (!lastScanTime || scanDt > lastScanTime) lastScanTime = scanDt; }
                     });
 
-                    if (cPlaces > 0 && cScanned === cPlaces) {
-                        carsDone++;
-                        if (lastScanTime) durations.push((lastScanTime - dt) / 1000 / 60); 
-                    }
-
+                    if (cPlaces > 0 && cScanned === cPlaces) { carsDone++; if (lastScanTime) durations.push((lastScanTime - dt) / 1000 / 60); }
                     if (data.errors) {
                         errorsCount += data.errors.length;
-                        data.errors.forEach(e => {
-                            if (e.scannedBy) userErrors[e.scannedBy] = (userErrors[e.scannedBy] || 0) + 1;
-                        });
+                        data.errors.forEach(e => { if (e.scannedBy) userErrors[e.scannedBy] = (userErrors[e.scannedBy] || 0) + 1; });
                     }
                 });
 
@@ -540,31 +613,27 @@
                 
                 if (durations.length > 0) {
                     let avg = durations.reduce((a,b)=>a+b,0) / durations.length;
-                    document.getElementById('stat-time').innerText = Math.round(avg) + ' мин';
+                    document.getElementById('stat-time').innerText = Math.round(avg) + ' ' + t('time_min');
                 } else {
-                    document.getElementById('stat-time').innerText = '0 мин';
+                    document.getElementById('stat-time').innerText = '0 ' + t('time_min');
                 }
 
-                // Рендер ТОП
-                const scanArr = Object.entries(userScans).sort((a,b)=>b[1]-a[1]);
-                let scanHtml = '';
+                const scanArr = Object.entries(userScans).sort((a,b)=>b[1]-a[1]); let scanHtml = '';
                 scanArr.forEach((u, idx) => {
                     let medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '👤'));
-                    scanHtml += `<li class="flex justify-between items-center p-3 bg-gray-50 rounded border"><span class="font-bold text-gray-700">${medal} ${u[0].split('@')[0]}</span><span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-bold text-sm shadow-sm">${u[1]} шт</span></li>`;
+                    scanHtml += `<li class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded border dark:border-gray-600"><span class="font-bold text-gray-700 dark:text-gray-200">${medal} ${u[0].split('@')[0]}</span><span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-bold text-sm shadow-sm">${u[1]}</span></li>`;
                 });
-                document.getElementById('stat-top-users').innerHTML = scanHtml || '<li class="text-sm text-gray-500">Нет данных за этот период</li>';
+                document.getElementById('stat-top-users').innerHTML = scanHtml || `<li class="text-sm text-gray-500">${t('empty_stats')}</li>`;
 
-                const errArr = Object.entries(userErrors).sort((a,b)=>b[1]-a[1]);
-                let errHtml = '';
+                const errArr = Object.entries(userErrors).sort((a,b)=>b[1]-a[1]); let errHtml = '';
                 errArr.forEach(u => {
-                    errHtml += `<li class="flex justify-between items-center p-3 bg-gray-50 rounded border"><span class="font-bold text-gray-700">🚩 ${u[0].split('@')[0]}</span><span class="bg-red-100 text-red-800 px-3 py-1 rounded-full font-bold text-sm shadow-sm">${u[1]} ошибок</span></li>`;
+                    errHtml += `<li class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded border dark:border-gray-600"><span class="font-bold text-gray-700 dark:text-gray-200">🚩 ${u[0].split('@')[0]}</span><span class="bg-red-100 text-red-800 px-3 py-1 rounded-full font-bold text-sm shadow-sm">${u[1]}</span></li>`;
                 });
-                document.getElementById('stat-top-errors').innerHTML = errHtml || '<li class="text-sm text-gray-500">Ошибок нет, идеальная работа!</li>';
+                document.getElementById('stat-top-errors').innerHTML = errHtml || `<li class="text-sm text-gray-500">Ошибок нет / No errors</li>`;
             });
         }
 
-
-        // --- АВТОРИЗАЦИЯ ---
+        // --- АВТОРИЗАЦІЯ ---
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
@@ -574,25 +643,24 @@
                 document.getElementById('dashboard-screen').classList.remove('hidden');
                 document.getElementById('date-ribbon').classList.remove('hidden');
                 
-                let roleLabel = isAdmin ? 'ОФИС' : 'СКЛАД';
+                let roleLabel = isAdmin ? t('role_office') : t('role_warehouse');
                 document.getElementById('user-info').innerHTML = `${user.email} <span class="bg-blue-900 text-white px-2 py-0.5 rounded ml-2 text-xs font-bold shadow-sm">${roleLabel}</span>`;
                 
                 if (isAdmin) {
                     document.getElementById('create-btn').classList.remove('hidden');
-                    document.getElementById('nav-analytics-btn').classList.remove('hidden');
                     document.getElementById('chat-quick-replies').classList.add('hidden'); 
                 } else {
                     document.getElementById('create-btn').classList.add('hidden');
-                    document.getElementById('nav-analytics-btn').classList.add('hidden');
                     document.getElementById('chat-quick-replies').classList.remove('hidden'); 
                 }
 
+                translateUI(); // Первинний переклад
                 startPresenceTracker();
                 updateDateDisplay();
                 loadDashboard();
             } else {
-                currentUser = null;
-                isAdmin = false;
+                currentUser = null; isAdmin = false;
+                translateUI();
                 if(presenceInterval) clearInterval(presenceInterval);
                 document.getElementById('login-screen').classList.remove('hidden');
                 document.getElementById('dashboard-screen').classList.add('hidden');
@@ -607,7 +675,7 @@
             const e = document.getElementById('email').value.trim();
             const p = document.getElementById('password').value.trim();
             const err = document.getElementById('login-error');
-            auth.signInWithEmailAndPassword(e, p).catch(error => { err.innerText = "Ошибка входа!"; err.classList.remove('hidden'); });
+            auth.signInWithEmailAndPassword(e, p).catch(error => { err.innerText = t('login_error'); err.classList.remove('hidden'); });
         }
 
         function logout() { 
@@ -615,22 +683,17 @@
             auth.signOut(); 
         }
 
-        // --- ПАРСЕР ---
+        // --- ПАРСЕР ТА СТВОРЕННЯ ---
         function parseExcelData(text) {
-            const lines = text.split('\n');
-            const items = [];
-            const seen = new Set();
+            const lines = text.split('\n'); const items = []; const seen = new Set();
             lines.forEach(line => {
-                line = line.trim();
-                if(!line) return;
+                line = line.trim(); if(!line) return;
                 let code = "", brutto = "-", netto = "-", pcs = "-", totalPlaces = 1;
                 if (line.includes('\t')) {
-                    const cols = line.split('\t').map(c => c.trim());
-                    let codeCol = "";
+                    const cols = line.split('\t').map(c => c.trim()); let codeCol = "";
                     for (let i = 0; i < Math.min(3, cols.length); i++) { if (cols[i].length > codeCol.length) codeCol = cols[i]; }
                     if (codeCol.includes('/')) codeCol = codeCol.split('/')[0];
-                    code = codeCol.trim().toUpperCase();
-                    if (/^[A-Z]{2}MF/.test(code)) code = code.substring(2);
+                    code = codeCol.trim().toUpperCase(); if (/^[A-Z]{2}MF/.test(code)) code = code.substring(2);
                     let paletaIdx = cols.findIndex(c => c.toLowerCase().includes('paleta'));
                     if (paletaIdx > 0) { totalPlaces = parseInt(cols[paletaIdx - 1], 10) || 1; } 
                     else { let numCol = cols.find((c, idx) => idx > 0 && c.length > 0 && !isNaN(parseInt(c, 10))); if (numCol) totalPlaces = parseInt(numCol, 10) || 1; }
@@ -650,71 +713,48 @@
                     }
                 }
                 if (!code || code.length < 4) return;
-                if (seen.has(code)) return;
-                seen.add(code);
+                if (seen.has(code)) return; seen.add(code);
                 items.push({ code: code, status: 'pending', isCancelled: false, totalPlaces: totalPlaces, scannedPlaces: 0, scannedBy: null, scannedAt: null, brutto: brutto, netto: netto, pcs: pcs });
             });
             return items;
         }
 
         function updateManifestCount() {
-            const text = document.getElementById('new-manifests-list').value;
-            const items = parseExcelData(text);
-            const counter = document.getElementById('manifest-counter');
+            const text = document.getElementById('new-manifests-list').value; const items = parseExcelData(text); const counter = document.getElementById('manifest-counter');
             if (items.length > 0) {
                 const totalPallets = items.reduce((sum, item) => sum + item.totalPlaces, 0);
-                counter.innerText = `Распознано: ${items.length} манифестов (${totalPallets} палет)`;
-                counter.className = "text-green-600 font-bold mb-4 h-6";
-            } else {
-                counter.innerText = `Номера пока не найдены...`;
-                counter.className = "text-gray-500 mb-4 h-6";
-            }
+                counter.innerText = `${items.length} ( ${totalPallets} )`; counter.className = "text-green-600 font-bold mb-4 h-6";
+            } else { counter.innerText = t('modal_counter_empty'); counter.className = "text-gray-500 mb-4 h-6"; }
         }
 
         function showCreateForm() {
-            editingManifestId = null;
-            document.getElementById('modal-title').innerText = 'Новая ведомость';
-            document.getElementById('new-car-number').value = '';
-            document.getElementById('new-manifests-list').value = '';
-            document.getElementById('new-manifest-type').disabled = false;
-            document.getElementById('new-manifest-type').value = 'load';
-            document.getElementById('create-modal').classList.remove('hidden');
-            updateManifestCount();
+            editingManifestId = null; document.getElementById('modal-title').innerText = t('modal_new_title');
+            document.getElementById('new-car-number').value = ''; document.getElementById('new-manifests-list').value = '';
+            document.getElementById('new-manifest-type').disabled = false; document.getElementById('new-manifest-type').value = 'load';
+            document.getElementById('create-modal').classList.remove('hidden'); updateManifestCount();
         }
 
         async function editManifest(event, id) {
-            event.stopPropagation();
-            if (!isAdmin) return;
-            const docSnap = await db.collection('manifests').doc(id).get();
-            if (!docSnap.exists) return;
-            const data = docSnap.data();
-            editingManifestId = id;
-            document.getElementById('modal-title').innerText = 'Редактирование ведомости';
-            document.getElementById('new-car-number').value = data.carNumber;
-            document.getElementById('new-manifest-type').value = data.docType || 'load';
+            event.stopPropagation(); if (!isAdmin) return;
+            const docSnap = await db.collection('manifests').doc(id).get(); if (!docSnap.exists) return;
+            const data = docSnap.data(); editingManifestId = id;
+            document.getElementById('modal-title').innerText = 'Редагування / Edit';
+            document.getElementById('new-car-number').value = data.carNumber; document.getElementById('new-manifest-type').value = data.docType || 'load';
             document.getElementById('new-manifest-type').disabled = true; 
             const text = data.items.filter(i => i.status !== 'removed').map(i => `${i.code}\t\t${i.totalPlaces} paleta\t\t${i.brutto}\t${i.netto}\t\t${i.pcs}`).join('\n');
-            document.getElementById('new-manifests-list').value = text;
-            document.getElementById('create-modal').classList.remove('hidden');
-            updateManifestCount();
+            document.getElementById('new-manifests-list').value = text; document.getElementById('create-modal').classList.remove('hidden'); updateManifestCount();
         }
 
         function hideCreateForm() { document.getElementById('create-modal').classList.add('hidden'); }
 
         async function saveManifest() {
-            const car = document.getElementById('new-car-number').value.trim();
-            const docType = document.getElementById('new-manifest-type').value;
-            const text = document.getElementById('new-manifests-list').value;
-            const newItemsParsed = parseExcelData(text);
-            if (!car) return alert("Введите номер автомобиля!");
-            if (newItemsParsed.length === 0) return alert("Не удалось распознать номера!");
+            const car = document.getElementById('new-car-number').value.trim(); const docType = document.getElementById('new-manifest-type').value;
+            const text = document.getElementById('new-manifests-list').value; const newItemsParsed = parseExcelData(text);
+            if (!car || newItemsParsed.length === 0) return alert("Empty!");
             try {
                 if (editingManifestId) {
-                    const docRef = db.collection('manifests').doc(editingManifestId);
-                    const docSnap = await docRef.get();
-                    const data = docSnap.data();
-                    const oldItems = data.items;
-                    let mergedItems = []; let addedLog = []; let removedLog = []; let changedLog = [];
+                    const docRef = db.collection('manifests').doc(editingManifestId); const docSnap = await docRef.get(); const data = docSnap.data();
+                    const oldItems = data.items; let mergedItems = []; let addedLog = []; let removedLog = []; let changedLog = [];
                     oldItems.forEach(oldItem => {
                         const foundInNew = newItemsParsed.find(n => n.code === oldItem.code);
                         if (foundInNew) {
@@ -727,15 +767,10 @@
                             if (oldItem.scannedPlaces > 0 && oldItem.status !== 'removed') { oldItem.isCancelled = true; mergedItems.push(oldItem); } 
                         }
                     });
-                    newItemsParsed.forEach(newItem => {
-                        const foundInOld = oldItems.find(o => o.code === newItem.code);
-                        if (!foundInOld) { addedLog.push(newItem.code); mergedItems.push(newItem); }
-                    });
-                    const editHistory = data.editHistory || [];
-                    let isModifiedFlag = data.modified || false;
+                    newItemsParsed.forEach(newItem => { const foundInOld = oldItems.find(o => o.code === newItem.code); if (!foundInOld) { addedLog.push(newItem.code); mergedItems.push(newItem); } });
+                    const editHistory = data.editHistory || []; let isModifiedFlag = data.modified || false;
                     if (addedLog.length > 0 || removedLog.length > 0 || changedLog.length > 0) {
-                        editHistory.push({ editedAt: new Date().toISOString(), editedBy: currentUser.email, added: addedLog, removed: removedLog, changed: changedLog });
-                        isModifiedFlag = true;
+                        editHistory.push({ editedAt: new Date().toISOString(), editedBy: currentUser.email, added: addedLog, removed: removedLog, changed: changedLog }); isModifiedFlag = true;
                     }
                     await docRef.update({ carNumber: car, items: mergedItems, editHistory: editHistory, modified: isModifiedFlag });
                 } else {
@@ -745,19 +780,14 @@
                     });
                 }
                 hideCreateForm();
-            } catch (err) { alert("Ошибка сохранения: " + err.message); }
+            } catch (err) { alert("Error: " + err.message); }
         }
 
-        async function deleteManifest(event, id) {
-            event.stopPropagation();
-            if (!isAdmin) return;
-            if (confirm("Полностью удалить ведомость?")) await db.collection('manifests').doc(id).delete();
-        }
+        async function deleteManifest(event, id) { event.stopPropagation(); if (!isAdmin) return; if (confirm("Delete?")) await db.collection('manifests').doc(id).delete(); }
 
-        // --- ДАШБОРД (ГЛАВНЫЙ ЭКРАН) ---
+        // --- ДАШБОРД (ГОЛОВНИЙ ЕКРАН) ---
         function loadDashboard() {
-            window.currentActivity = "Смотрит Главный экран";
-            updatePresence();
+            window.currentActivity = "Смотрит Главный экран"; updatePresence();
             if (unsubscribeManifests) unsubscribeManifests();
             const startOfDay = new Date(currentDate); startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date(currentDate); endOfDay.setHours(23, 59, 59, 999);
@@ -765,21 +795,16 @@
             unsubscribeManifests = db.collection('manifests').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
                 let isInitialLoad = Object.keys(previousMessageCounts).length === 0;
                 snapshot.docChanges().forEach(change => {
-                    const data = change.doc.data();
-                    const msgCount = data.messages ? data.messages.length : 0;
+                    const data = change.doc.data(); const msgCount = data.messages ? data.messages.length : 0;
                     if (change.type === 'added' || change.type === 'modified') {
                         const prevCount = previousMessageCounts[change.doc.id] || 0;
-                        if (!isInitialLoad && msgCount > prevCount) {
-                            const lastMsg = data.messages[msgCount - 1];
-                            if (lastMsg && lastMsg.sender !== currentUser.email) playBloop();
-                        }
+                        if (!isInitialLoad && msgCount > prevCount) { const lastMsg = data.messages[msgCount - 1]; if (lastMsg && lastMsg.sender !== currentUser.email) playBloop(); }
                         previousMessageCounts[change.doc.id] = msgCount;
                     }
                     if (change.type === 'removed') delete previousMessageCounts[change.doc.id];
                 });
 
-                const grid = document.getElementById('manifests-grid');
-                grid.innerHTML = ''; let itemsShown = 0;
+                const grid = document.getElementById('manifests-grid'); grid.innerHTML = ''; let itemsShown = 0;
                 
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -791,11 +816,8 @@
                     const isLoad = !data.docType || data.docType === 'load';
 
                     data.items.forEach(i => {
-                        if (i.isCancelled && i.scannedPlaces > 0) { needsReturn = true; returnList.push(`${i.code} (${i.scannedPlaces} шт)`); }
-                        if (i.status !== 'removed') {
-                            totalPlaces += (i.totalPlaces || 1);
-                            scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
-                        }
+                        if (i.isCancelled && i.scannedPlaces > 0) { needsReturn = true; returnList.push(`${i.code} (${i.scannedPlaces})`); }
+                        if (i.status !== 'removed') { totalPlaces += (i.totalPlaces || 1); scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0)); }
                         if (i.scannedAt && !i.isCancelled) { let dt = new Date(i.scannedAt); if (!lastScanDt || dt > lastScanDt) lastScanDt = dt; }
                     });
 
@@ -805,31 +827,31 @@
                         let diffSecs = Math.floor((lastScanDt - docDate) / 1000);
                         if (diffSecs >= 0) {
                             let h = Math.floor(diffSecs / 3600); let m = Math.floor((diffSecs % 3600) / 60);
-                            durationHtml = `<div class="text-xs text-gray-700 mt-2 font-bold bg-white bg-opacity-50 p-1 rounded inline-block">⏱ Время: ${h > 0 ? h + ' ч ' : ''}${m} мин</div>`;
+                            durationHtml = `<div class="text-xs text-gray-700 dark:text-gray-300 mt-2 font-bold bg-white dark:bg-gray-800 bg-opacity-50 p-1 rounded inline-block">⏱ ${h > 0 ? h + t('time_h') + ' ' : ''}${m} ${t('time_min')}</div>`;
                         }
                     }
 
-                    let typeBadge = isLoad ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold shadow-sm">ЗАГРУЗКА</span>' : '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold shadow-sm">ВЫГРУЗКА</span>';
-                    if (data.modified && !isCompleted && !needsReturn) typeBadge += ' <span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded font-bold ml-1 shadow-sm">⚠️ ИЗМЕНЕНА</span>';
+                    let typeBadge = isLoad ? `<span class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded font-bold shadow-sm">${t('badge_load')}</span>` : `<span class="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-1 rounded font-bold shadow-sm">${t('badge_unload')}</span>`;
+                    if (data.modified && !isCompleted && !needsReturn) typeBadge += ` <span class="text-xs bg-yellow-200 dark:bg-yellow-700 text-yellow-800 dark:text-yellow-100 px-2 py-1 rounded font-bold ml-1 shadow-sm">${t('badge_changed')}</span>`;
 
-                    let cardClass = isLoad ? (isCompleted ? 'bg-green-100 border-green-500' : 'bg-white border-blue-400') : (isCompleted ? 'bg-orange-100 border-orange-500' : 'bg-white border-purple-400');
-                    if (data.modified && !isCompleted && !needsReturn) cardClass = 'bg-yellow-50 border-yellow-400';
+                    let cardClass = isLoad ? (isCompleted ? 'bg-green-100 dark:bg-green-900 border-green-500' : 'bg-white dark:bg-gray-800 border-blue-400 dark:border-blue-600') : (isCompleted ? 'bg-orange-100 dark:bg-orange-900 border-orange-500' : 'bg-white dark:bg-gray-800 border-purple-400 dark:border-purple-600');
+                    if (data.modified && !isCompleted && !needsReturn) cardClass = 'bg-yellow-50 dark:bg-yellow-900/40 border-yellow-400';
                     
-                    let textColor = isLoad ? (isCompleted ? 'text-green-700' : 'text-blue-800') : (isCompleted ? 'text-orange-700' : 'text-purple-800');
+                    let textColor = isLoad ? (isCompleted ? 'text-green-700 dark:text-green-300' : 'text-blue-800 dark:text-blue-300') : (isCompleted ? 'text-orange-700 dark:text-orange-300' : 'text-purple-800 dark:text-purple-300');
                     let barColor = isLoad ? (isCompleted ? 'bg-green-500' : 'bg-blue-500') : (isCompleted ? 'bg-orange-500' : 'bg-purple-500');
 
                     let returnAlertHtml = '';
                     if (needsReturn) {
-                        cardClass = 'urgent-blink'; textColor = 'text-red-900';
-                        returnAlertHtml = `<div class="mt-3 bg-red-600 text-white p-2 rounded shadow-inner border border-red-800"><div class="text-sm font-bold mb-1">⚠️ ИЗМЕНЕНИЕ! ВЕРНУТЬ:</div><div class="font-mono text-xs leading-tight">${returnList.join(', ')}</div></div>`;
+                        cardClass = 'urgent-blink'; textColor = 'text-red-900 dark:text-red-300';
+                        returnAlertHtml = `<div class="mt-3 bg-red-600 text-white p-2 rounded shadow-inner border border-red-800"><div class="text-sm font-bold mb-1">${t('alert_return')}</div><div class="font-mono text-xs leading-tight">${returnList.join(', ')}</div></div>`;
                     }
 
                     const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
                     const hasUnread = data.messages && data.messages.length > 0 && (!data.readBy || !data.readBy.includes(currentUser.email));
                     const chatBadge = hasUnread ? `<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>` : '';
 
-                    let actionButtons = `<div class="absolute top-2 right-2 flex gap-1 z-10"><button onclick="openChatPanel(event, '${doc.id}', '${data.carNumber}')" class="relative text-blue-600 bg-blue-50 hover:bg-blue-100 rounded p-1 shadow-sm border border-blue-200 transition ${hasUnread ? 'animate-bounce' : ''}" title="Чат">💬${chatBadge}</button>`;
-                    if (isAdmin) actionButtons += `<button onclick="editManifest(event, '${doc.id}')" class="text-gray-600 hover:text-blue-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Редактировать">✏️</button><button onclick="deleteManifest(event, '${doc.id}')" class="text-gray-600 hover:text-red-600 bg-gray-100 hover:bg-white rounded p-1 shadow-sm border border-gray-200 transition" title="Удалить">✖</button>`;
+                    let actionButtons = `<div class="absolute top-2 right-2 flex gap-1 z-10"><button onclick="openChatPanel(event, '${doc.id}', '${data.carNumber}')" class="relative text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/50 hover:bg-blue-100 rounded p-1 shadow-sm border border-blue-200 dark:border-blue-700 transition ${hasUnread ? 'animate-bounce' : ''}" title="Chat">💬${chatBadge}</button>`;
+                    if (isAdmin) actionButtons += `<button onclick="editManifest(event, '${doc.id}')" class="text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded p-1 shadow-sm border border-gray-200 dark:border-gray-600 transition">✏️</button><button onclick="deleteManifest(event, '${doc.id}')" class="text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded p-1 shadow-sm border border-gray-200 dark:border-gray-600 transition">✖</button>`;
                     actionButtons += `</div>`;
 
                     grid.innerHTML += `
@@ -837,66 +859,52 @@
                             ${actionButtons}
                             <div class="mb-3 pr-24">${typeBadge}</div>
                             <div class="flex justify-between items-end mb-2 pr-24">
-                                <h3 class="text-xl font-bold ${textColor} leading-none">${data.carNumber}</h3><span class="text-sm font-bold ${textColor}">${scannedPlaces} / ${totalPlaces} мест</span>
+                                <h3 class="text-xl font-bold ${textColor} leading-none">${data.carNumber}</h3><span class="text-sm font-bold ${textColor}">${scannedPlaces} / ${totalPlaces}</span>
                             </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2"><div class="${barColor} h-2.5 rounded-full" style="width: ${percent}%"></div></div>
-                            <div class="text-xs text-gray-500 mt-2">Создал: ${data.creatorEmail}</div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2"><div class="${barColor} h-2.5 rounded-full" style="width: ${percent}%"></div></div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-2">${data.creatorEmail}</div>
                             ${durationHtml}${returnAlertHtml}
                         </div>`;
                 });
-                if (itemsShown === 0) grid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10 font-bold">За выбранную дату (${currentDate.toLocaleDateString('ru-RU')}) машин нет.</div>`;
+                if (itemsShown === 0) grid.innerHTML = `<div class="col-span-full text-center text-gray-500 dark:text-gray-400 mt-10 font-bold">${t('empty_stats')}</div>`;
             });
         }
 
-        // --- ЛОГИКА РАЗВЕРТЫВАНИЯ СПИСКА ---
+        // --- ЛОГІКА РОЗГОРТАННЯ СПИСКУ (РЕЖИМ ЗВІРКИ) ---
         let isListExpanded = false;
-        function toggleListMode() {
-            isListExpanded = !isListExpanded;
+        function toggleListMode(forceRefresh = false) {
+            if(!forceRefresh) isListExpanded = !isListExpanded;
             const listArea = document.getElementById('scan-list-area');
             const btn = document.getElementById('toggle-list-btn');
 
             if (isListExpanded) {
                 listArea.classList.add('expanded-list');
-                btn.innerHTML = '🔙 <b>ЗАВЕРШИТЬ СВЕРКУ (К сканеру)</b>';
-                btn.className = "bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 text-center shadow-lg z-10 w-full border-b flex justify-center items-center gap-2 transition-colors text-lg rounded-b";
+                btn.innerHTML = `🔙 <b>${t('collapse_list')}</b>`;
+                btn.className = "bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 text-center shadow-lg z-10 w-full border-b dark:border-gray-700 flex justify-center items-center gap-2 transition-colors text-lg rounded-b";
             } else {
                 listArea.classList.remove('expanded-list');
-                btn.innerHTML = '🔍 Развернуть список для сверки';
-                btn.className = "bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold p-3 text-center shadow-sm z-10 w-full border-b flex justify-center items-center gap-2 transition-colors text-sm";
-                document.getElementById('scanner-input').focus();
+                btn.innerHTML = `🔍 ${t('expand_list')}`;
+                btn.className = "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold p-3 text-center shadow-sm z-10 w-full border-b dark:border-gray-600 flex justify-center items-center gap-2 transition-colors text-sm";
+                if(!forceRefresh) document.getElementById('scanner-input').focus();
             }
         }
 
         // --- СКАНЕР ---
         function openScanner(id, carNumber) {
-            currentScanId = id;
-            window.currentActivity = `В авто: ${carNumber}`;
-            updatePresence();
-            
-            document.getElementById('dashboard-screen').classList.add('hidden');
-            document.getElementById('date-ribbon').classList.add('hidden');
-            document.getElementById('scan-screen').classList.remove('hidden');
-            document.getElementById('scan-car-number').innerText = carNumber;
-            document.getElementById('sound-unlock-overlay').style.display = 'flex';
-            document.getElementById('scanner-input').value = '';
+            currentScanId = id; window.currentActivity = `В авто: ${carNumber}`; updatePresence();
+            document.getElementById('dashboard-screen').classList.add('hidden'); document.getElementById('date-ribbon').classList.add('hidden'); document.getElementById('scan-screen').classList.remove('hidden');
+            document.getElementById('scan-car-number').innerText = carNumber; document.getElementById('sound-unlock-overlay').style.display = 'flex'; document.getElementById('scanner-input').value = '';
 
-            // Сбрасываем статус кнопки развертывания
-            isListExpanded = false;
-            document.getElementById('scan-list-area').classList.remove('expanded-list');
-            const btn = document.getElementById('toggle-list-btn');
-            btn.innerHTML = '🔍 Развернуть список для сверки';
-            btn.className = "bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold p-3 text-center shadow-sm z-10 w-full border-b flex justify-center items-center gap-2 transition-colors text-sm";
+            isListExpanded = false; toggleListMode(true); // reset expand
 
             if (unsubscribeCurrentScan) unsubscribeCurrentScan();
             unsubscribeCurrentScan = db.collection('manifests').doc(id).onSnapshot(doc => {
                 if(doc.exists) {
-                    currentManifestDoc = doc.data(); const data = doc.data();
-                    const isLoad = !data.docType || data.docType === 'load';
+                    currentManifestDoc = doc.data(); const data = doc.data(); const isLoad = !data.docType || data.docType === 'load';
                     
-                    const docTypeBadge = document.getElementById('scan-doc-type');
-                    const actionWord = document.getElementById('scan-action-word');
-                    if (isLoad) { docTypeBadge.innerText = 'ЗАГРУЗКА'; docTypeBadge.className = 'ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block'; actionWord.innerText = 'загружено'; } 
-                    else { docTypeBadge.innerText = 'ВЫГРУЗКА'; docTypeBadge.className = 'ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block'; actionWord.innerText = 'выгружено'; }
+                    const docTypeBadge = document.getElementById('scan-doc-type'); const actionWord = document.getElementById('scan-action-word');
+                    if (isLoad) { docTypeBadge.innerText = t('badge_load'); docTypeBadge.className = 'ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block'; actionWord.innerText = t('word_loaded'); } 
+                    else { docTypeBadge.innerText = t('badge_unload'); docTypeBadge.className = 'ml-2 text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block'; actionWord.innerText = t('word_unloaded'); }
 
                     const hasUnread = data.messages && data.messages.length > 0 && (!data.readBy || !data.readBy.includes(currentUser.email));
                     const chatBadge = document.getElementById('scan-chat-badge');
@@ -907,65 +915,48 @@
                     
                     data.items.forEach(item => {
                         if (item.status === 'removed') return; 
-                        const iTotal = item.totalPlaces || 1;
-                        const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
+                        const iTotal = item.totalPlaces || 1; const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
                         
-                        if (!item.isCancelled) { totalPlaces += iTotal; scannedPlaces += iScanned; } else if (iScanned > 0) { returns.push(`${item.code} (${iScanned} шт)`); }
+                        if (!item.isCancelled) { totalPlaces += iTotal; scannedPlaces += iScanned; } else if (iScanned > 0) { returns.push(`${item.code} (${iScanned})`); }
                         
                         let liClass, icon, specialBadge = '';
-                        if (item.isCancelled) { liClass = 'bg-red-100 text-red-900 border-red-500 border-2 animate-pulse'; icon = '⚠️'; specialBadge = `<span class="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">ОТМЕНА! Вернуть: ${iScanned} шт</span>`; } 
-                        else if (iScanned === iTotal) { liClass = isLoad ? 'bg-green-100 text-green-800 opacity-70' : 'bg-orange-100 text-orange-800 opacity-70'; icon = '✓'; } 
-                        else if (iScanned > 0 && iScanned < iTotal) { liClass = 'bg-yellow-50 text-yellow-800 border-yellow-400 border-2'; icon = '🔄'; } 
-                        else { liClass = 'bg-white text-gray-900 border-gray-300 border-2'; icon = '⏳'; }
+                        if (item.isCancelled) { liClass = 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-100 border-red-500 border-2 animate-pulse'; icon = '⚠️'; specialBadge = `<span class="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">${t('flash_return')} ${iScanned}</span>`; } 
+                        else if (iScanned === iTotal) { liClass = isLoad ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 opacity-70' : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-100 opacity-70'; icon = '✓'; } 
+                        else if (iScanned > 0 && iScanned < iTotal) { liClass = 'bg-yellow-50 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-400 border-2'; icon = '🔄'; } 
+                        else { liClass = 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 border-2'; icon = '⏳'; }
                         
-                        let timeHtml = '';
-                        if (item.scannedAt && !item.isCancelled) { const dt = new Date(item.scannedAt); timeHtml = `<span class="text-xs text-blue-700 ml-2 font-bold">${dt.toLocaleTimeString('ru-RU')}</span>`; }
+                        let timeHtml = ''; if (item.scannedAt && !item.isCancelled) { const dt = new Date(item.scannedAt); timeHtml = `<span class="text-xs text-blue-700 dark:text-blue-400 ml-2 font-bold">${dt.toLocaleTimeString('ru-RU')}</span>`; }
 
                         listEl.innerHTML += `
                             <li class="p-2 rounded flex flex-col gap-1 ${liClass} transition-colors">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2"><span class="font-bold">${icon}</span><span class="font-bold text-sm md:text-base ${item.isCancelled ? 'line-through' : ''}">${item.code}</span>${timeHtml}</div>
-                                    ${item.isCancelled ? specialBadge : `<span class="text-xs font-bold bg-white px-2 py-1 rounded opacity-80 border">${iScanned}/${iTotal} палет</span>`}
+                                    ${item.isCancelled ? specialBadge : `<span class="text-xs font-bold bg-white dark:bg-gray-700 px-2 py-1 rounded opacity-80 border dark:border-gray-600">${iScanned}/${iTotal}</span>`}
                                 </div>
-                                <div class="text-[10px] md:text-xs text-gray-600 font-mono ml-5">Вес: ${item.brutto}/${item.netto} | Шт: ${item.pcs}</div>
+                                <div class="text-[10px] md:text-xs text-gray-600 dark:text-gray-300 font-mono ml-5">${t('flash_weight')} ${item.brutto}/${item.netto} | PCS: ${item.pcs}</div>
                             </li>`;
                     });
                     
                     document.getElementById('scan-count').innerText = scannedPlaces; document.getElementById('scan-total').innerText = totalPlaces;
                     const alertBar = document.getElementById('scan-alert-bar');
-                    if (returns.length > 0) { alertBar.innerHTML = `⚠️ ВНИМАНИЕ, ИЗМЕНЕНИЯ! НУЖНО ВЕРНУТЬ:<br><span class="font-mono text-sm">${returns.join(', ')}</span>`; alertBar.classList.remove('hidden'); } 
+                    if (returns.length > 0) { alertBar.innerHTML = `${t('alert_return')}<br><span class="font-mono text-sm">${returns.join(', ')}</span>`; alertBar.classList.remove('hidden'); } 
                     else { alertBar.classList.add('hidden'); }
                 } else { closeScanner(); }
             });
         }
 
         function closeScanner() {
-            // ФИКС ЧАТА: Принудительно закрываем панель чата при выходе из машины
-            closeChatPanel(); 
-            
-            window.currentActivity = "Смотрит Главный экран";
-            updatePresence();
-            if (unsubscribeCurrentScan) unsubscribeCurrentScan();
-            currentScanId = null;
-            document.getElementById('scan-screen').classList.add('hidden');
-            document.getElementById('dashboard-screen').classList.remove('hidden');
-            document.getElementById('date-ribbon').classList.remove('hidden');
+            closeChatPanel(); // ФІКС ЧАТУ: закриваємо панель при виході
+            window.currentActivity = "Смотрит Главный экран"; updatePresence();
+            if (unsubscribeCurrentScan) unsubscribeCurrentScan(); currentScanId = null;
+            document.getElementById('scan-screen').classList.add('hidden'); document.getElementById('dashboard-screen').classList.remove('hidden'); document.getElementById('date-ribbon').classList.remove('hidden');
         }
 
-        document.getElementById('scanner-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                processBarcode(this.value.trim());
-                this.value = '';
-            }
-        });
+        document.getElementById('scanner-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); processBarcode(this.value.trim()); this.value = ''; } });
 
         async function processBarcode(code) {
-            if (!code || !currentScanId) return;
-            const cleanCode = code.trim().toUpperCase();
-            const docRef = db.collection('manifests').doc(currentScanId);
-            const docSnap = await docRef.get();
-            if (!docSnap.exists) return;
+            if (!code || !currentScanId) return; const cleanCode = code.trim().toUpperCase();
+            const docRef = db.collection('manifests').doc(currentScanId); const docSnap = await docRef.get(); if (!docSnap.exists) return;
             const data = docSnap.data(); const items = data.items;
             let alreadyScanned = false; let foundItem = null; let isUndoMode = false;
 
@@ -974,8 +965,7 @@
                     if (items[i].isCancelled && items[i].scannedPlaces > 0) {
                         items[i].scannedPlaces -= 1; items[i].scannedBy = currentUser.email; items[i].scannedAt = new Date().toISOString();
                         if (items[i].scannedPlaces === 0) { items[i].status = 'removed'; items[i].isCancelled = false; }
-                        foundItem = items[i]; isUndoMode = true;
-                        await docRef.update({ items: items }); showSuccessFlash(foundItem, true); return;
+                        foundItem = items[i]; isUndoMode = true; await docRef.update({ items: items }); showSuccessFlash(foundItem, true); return;
                     } else if (!items[i].isCancelled) {
                         const iTotal = items[i].totalPlaces || 1; const iScanned = items[i].scannedPlaces !== undefined ? items[i].scannedPlaces : (items[i].status === 'scanned' ? iTotal : 0);
                         if (iScanned < iTotal) {
@@ -986,30 +976,29 @@
                     }
                 }
             }
-            const errorMsg = alreadyScanned ? `Номер ${cleanCode} УЖЕ ОБРАБОТАН!` : `Номер ${cleanCode} ЧУЖОЙ!`;
-            await docRef.update({ errors: firebase.firestore.FieldValue.arrayUnion({ code: cleanCode, message: alreadyScanned ? 'Повтор' : 'Лишний номер', scannedBy: currentUser.email, scannedAt: new Date().toISOString() }) });
+            const errorMsg = alreadyScanned ? `${t('err_repeat')} ${cleanCode}` : `${t('err_alien')} ${cleanCode}`;
+            await docRef.update({ errors: firebase.firestore.FieldValue.arrayUnion({ code: cleanCode, message: errorMsg, scannedBy: currentUser.email, scannedAt: new Date().toISOString() }) });
             showErrorOverlay(errorMsg);
         }
 
         function showSuccessFlash(item, isUndo) {
-            playSuccessSound();
-            const area = document.getElementById('scan-flash-area');
-            area.className = `flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b md:border-b-0 md:border-r overflow-y-auto ${isUndo ? 'flash-orange' : 'flash-green'}`;
+            playSuccessSound(); const area = document.getElementById('scan-flash-area');
+            area.className = `flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b dark:border-gray-700 md:border-b-0 md:border-r overflow-y-auto ${isUndo ? 'flash-orange' : 'flash-green'}`;
             void area.offsetWidth; area.classList.add(isUndo ? 'flash-orange' : 'flash-green');
             
             if (isUndo) {
-                document.getElementById('scan-last-result').innerHTML = `<div class="text-orange-600 font-bold text-2xl md:text-3xl">✔ ВОЗВРАТ: ${item.code}</div><div class="text-gray-800 font-bold text-xl mt-2 bg-orange-200 inline-block px-4 py-1 rounded shadow-sm">Осталось вернуть: ${item.scannedPlaces} палет</div>`;
+                document.getElementById('scan-last-result').innerHTML = `<div class="text-orange-600 font-bold text-2xl md:text-3xl">✔ ${t('flash_return')} ${item.code}</div><div class="text-gray-800 dark:text-gray-900 font-bold text-xl mt-2 bg-orange-200 inline-block px-4 py-1 rounded shadow-sm">${t('flash_left_return')} ${item.scannedPlaces}</div>`;
             } else {
-                const isDone = item.scannedPlaces === (item.totalPlaces || 1); const statusText = isDone ? 'ГОТОВО' : 'В ПРОЦЕССЕ';
+                const isDone = item.scannedPlaces === (item.totalPlaces || 1); const statusText = isDone ? t('flash_done') : t('flash_process');
                 const isLoad = !currentManifestDoc.docType || currentManifestDoc.docType === 'load'; const actionColor = isLoad ? 'text-green-600' : 'text-orange-600';
-                document.getElementById('scan-last-result').innerHTML = `<div class="${actionColor} font-bold text-2xl md:text-3xl">✔ ${item.code}</div><div class="text-gray-800 font-bold text-xl mt-2 bg-yellow-200 inline-block px-4 py-1 rounded shadow-sm">${item.scannedPlaces} из ${item.totalPlaces || 1} палет (${statusText})</div><div class="text-gray-600 font-bold text-lg mt-2">Вес (B/N): ${item.brutto} / ${item.netto} кг</div>`;
+                document.getElementById('scan-last-result').innerHTML = `<div class="${actionColor} font-bold text-2xl md:text-3xl">✔ ${item.code}</div><div class="text-gray-800 dark:text-gray-900 font-bold text-xl mt-2 bg-yellow-200 inline-block px-4 py-1 rounded shadow-sm">${item.scannedPlaces} / ${item.totalPlaces || 1} (${statusText})</div><div class="text-gray-600 dark:text-gray-300 font-bold text-lg mt-2">${t('flash_weight')} ${item.brutto} / ${item.netto}</div>`;
             }
         }
 
         function showErrorOverlay(message) { playErrorSound(); document.getElementById('error-message').innerText = message; document.getElementById('error-overlay').style.display = 'flex'; document.getElementById('scanner-input').blur(); }
         function closeErrorOverlay() { document.getElementById('error-overlay').style.display = 'none'; document.getElementById('scanner-input').focus(); }
 
-        // --- ВНУТРЕННИЙ ЧАТ ---
+        // --- ВНУТРІШНІЙ ЧАТ ---
         function openChatPanel(e, manifestId = null, carNum = null) {
             if(e) e.stopPropagation();
             if (manifestId) activeChatManifestId = manifestId; else activeChatManifestId = currentScanId; 
@@ -1026,12 +1015,12 @@
                 const data = doc.data(); const msgs = data.messages || []; const container = document.getElementById('chat-messages');
                 
                 if (msgs.length === 0) {
-                    container.innerHTML = `<div class="text-center text-gray-400 mt-10 text-sm font-bold">Нет сообщений. Напишите первым!</div>`;
+                    container.innerHTML = `<div class="text-center text-gray-400 mt-10 text-sm font-bold">...</div>`;
                 } else {
                     container.innerHTML = msgs.map(m => {
-                        const isMe = m.sender === currentUser.email; const align = isMe ? 'text-right' : 'text-left'; const bg = isMe ? 'bg-blue-100 text-blue-900 border border-blue-200' : 'bg-gray-100 text-gray-800 border border-gray-200';
+                        const isMe = m.sender === currentUser.email; const align = isMe ? 'text-right' : 'text-left'; const bg = isMe ? 'bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100 border border-blue-200 dark:border-blue-700' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600';
                         const date = new Date(m.timestamp).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'}); const name = m.sender.split('@')[0];
-                        return `<div class="${align} mb-3"><div class="text-[10px] text-gray-500 mb-0.5 font-bold">${m.senderRole} (${name}) • ${date}</div><div class="inline-block p-2 rounded-lg ${bg} text-sm shadow-sm text-left max-w-[85%]">${m.text}</div></div>`;
+                        return `<div class="${align} mb-3"><div class="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5 font-bold">${m.senderRole} (${name}) • ${date}</div><div class="inline-block p-2 rounded-lg ${bg} text-sm shadow-sm text-left max-w-[85%]">${m.text}</div></div>`;
                     }).join('');
                     container.scrollTop = container.scrollHeight;
                 }
@@ -1042,14 +1031,11 @@
             });
         }
 
-        function closeChatPanel() {
-            document.getElementById('chat-panel').classList.add('translate-x-full');
-            if(unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
-            activeChatManifestId = null;
-            document.getElementById('scanner-input')?.focus();
-        }
+        function closeChatPanel() { document.getElementById('chat-panel').classList.add('translate-x-full'); if(unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; } activeChatManifestId = null; document.getElementById('scanner-input')?.focus(); }
 
         document.getElementById('chat-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); } });
+
+        function sendQuickChat(key) { sendChatMessage(t(key)); }
 
         async function sendChatMessage(quickText = null) {
             const input = document.getElementById('chat-input');
@@ -1057,16 +1043,16 @@
             if (!text || !activeChatManifestId) return;
             input.value = ''; 
             await db.collection('manifests').doc(activeChatManifestId).update({
-                messages: firebase.firestore.FieldValue.arrayUnion({ text: text, sender: currentUser.email, senderRole: isAdmin ? 'Офис' : 'Склад', timestamp: new Date().toISOString() }),
+                messages: firebase.firestore.FieldValue.arrayUnion({ text: text, sender: currentUser.email, senderRole: isAdmin ? t('role_office') : t('role_warehouse'), timestamp: new Date().toISOString() }),
                 readBy: [currentUser.email]
             });
         }
 
-        // --- ПЕЧАТЬ PDF ---
+        // --- ПЕЧАТ PDF ---
         function generatePDF() {
             if (!currentManifestDoc) return;
             const data = currentManifestDoc; const isLoad = !data.docType || data.docType === 'load';
-            const actionVerb = isLoad ? "ЗАГРУЗКИ" : "ВЫГРУЗКИ"; const itemVerb = isLoad ? "Загружено" : "Выгружено";
+            const actionVerb = isLoad ? t('badge_load') : t('badge_unload'); const itemVerb = isLoad ? t('word_loaded') : t('word_unloaded');
             
             let totalPlaces = 0, scannedPlaces = 0, lastScanDt = null;
             data.items.forEach(i => {
@@ -1076,31 +1062,31 @@
             });
             
             let createdDt = null; if (data.createdAt) createdDt = typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate() : new Date(data.createdAt);
-            let createdStr = createdDt ? createdDt.toLocaleString('ru-RU') : '-'; let lastScanStr = lastScanDt ? lastScanDt.toLocaleString('ru-RU') : 'Нет сканирований';
+            let createdStr = createdDt ? createdDt.toLocaleString('ru-RU') : '-'; let lastScanStr = lastScanDt ? lastScanDt.toLocaleString('ru-RU') : '-';
             
             let durationStr = "-";
             if (createdDt && lastScanDt) {
                 let diffSecs = Math.floor((lastScanDt - createdDt) / 1000);
                 if (diffSecs >= 0) {
                     let h = Math.floor(diffSecs / 3600); let m = Math.floor((diffSecs % 3600) / 60); let s = diffSecs % 60;
-                    let parts = []; if (h > 0) parts.push(h + ' ч'); if (m > 0 || h > 0) parts.push(m + ' мин'); parts.push(s + ' сек'); durationStr = parts.join(' ');
+                    let parts = []; if (h > 0) parts.push(h + ' ' + t('time_h')); if (m > 0 || h > 0) parts.push(m + ' ' + t('time_min')); parts.push(s + ' ' + t('time_sec')); durationStr = parts.join(' ');
                 }
             }
 
-            let html = `<div style="text-align: center; margin-bottom: 20px;"><h1 style="font-size: 24px; font-family: sans-serif; margin-bottom: 5px;">АКТ ${actionVerb} Т/С</h1><p style="font-size: 18px; font-weight: bold; margin: 0;">Автомобиль: ${data.carNumber}</p></div><div style="display: flex; justify-content: space-between; font-family: sans-serif; font-size: 14px; margin-bottom: 20px; background: #f3f4f6; padding: 10px; border-radius: 5px;"><div><p style="margin: 3px 0;"><strong>Создана (Офис):</strong> ${createdStr}</p><p style="margin: 3px 0;"><strong>Автор:</strong> ${data.creatorEmail}</p><p style="margin: 3px 0;"><strong>Последний скан:</strong> ${lastScanStr}</p></div><div style="text-align: right;"><p style="margin: 3px 0; font-size: 16px;"><strong>Время обработки: <span style="color: #1d4ed8;">${durationStr}</span></strong></p><p style="margin: 3px 0; font-size: 16px;"><strong>Итог:</strong> ${itemVerb} ${scannedPlaces} из ${totalPlaces} мест</p></div></div><table class="print-table"><thead><tr><th>№</th><th>Код</th><th>Места</th><th>Brutto</th><th>Netto</th><th>PCS</th><th>Статус</th><th>Время скана</th></tr></thead><tbody>`;
+            let html = `<div style="text-align: center; margin-bottom: 20px;"><h1 style="font-size: 24px; font-family: sans-serif; margin-bottom: 5px;">${t('pdf_act')} ${actionVerb}</h1><p style="font-size: 18px; font-weight: bold; margin: 0;">${t('pdf_car')} ${data.carNumber}</p></div><div style="display: flex; justify-content: space-between; font-family: sans-serif; font-size: 14px; margin-bottom: 20px; background: #f3f4f6; padding: 10px; border-radius: 5px;"><div><p style="margin: 3px 0;"><strong>${t('pdf_created')}</strong> ${createdStr}</p><p style="margin: 3px 0;"><strong>${t('pdf_author')}</strong> ${data.creatorEmail}</p><p style="margin: 3px 0;"><strong>${t('pdf_last_scan')}</strong> ${lastScanStr}</p></div><div style="text-align: right;"><p style="margin: 3px 0; font-size: 16px;"><strong>${t('pdf_time')} <span style="color: #1d4ed8;">${durationStr}</span></strong></p><p style="margin: 3px 0; font-size: 16px;"><strong>${t('pdf_total')}</strong> ${itemVerb} ${scannedPlaces} / ${totalPlaces} ${t('pdf_places')}</p></div></div><table class="print-table"><thead><tr><th>${t('pdf_th1')}</th><th>${t('pdf_th2')}</th><th>${t('pdf_th3')}</th><th>${t('pdf_th4')}</th><th>${t('pdf_th5')}</th><th>${t('pdf_th6')}</th><th>${t('pdf_th7')}</th><th>${t('pdf_th8')}</th></tr></thead><tbody>`;
             let idx = 1;
             data.items.forEach((item) => {
                 if (item.status === 'removed') return; 
                 const iTotal = item.totalPlaces || 1; const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
                 let statusTxt = "";
-                if (item.isCancelled) statusTxt = "⚠️ ОШИБКА (ВЕРНУТЬ)"; else if (iScanned === iTotal) statusTxt = itemVerb.toUpperCase(); else if (iScanned > 0) statusTxt = "ЧАСТИЧНО"; else statusTxt = "ОЖИДАЕТ";
+                if (item.isCancelled) statusTxt = t('pdf_s_err'); else if (iScanned === iTotal) statusTxt = itemVerb.toUpperCase(); else if (iScanned > 0) statusTxt = t('pdf_s_part'); else statusTxt = t('pdf_s_wait');
                 let timeTxt = "-"; if (item.scannedAt && !item.isCancelled) { const dt = new Date(item.scannedAt); timeTxt = dt.toLocaleDateString('ru-RU') + " " + dt.toLocaleTimeString('ru-RU', { hour12: false }); }
-                html += `<tr><td>${idx++}</td><td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${item.code}</td><td>${iScanned} из ${iTotal}</td><td>${item.brutto}</td><td>${item.netto}</td><td>${item.pcs}</td><td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${statusTxt}</td><td>${timeTxt}</td></tr>`;
+                html += `<tr><td>${idx++}</td><td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${item.code}</td><td>${iScanned} / ${iTotal}</td><td>${item.brutto}</td><td>${item.netto}</td><td>${item.pcs}</td><td style="${item.isCancelled ? 'color:red; font-weight:bold;' : ''}">${statusTxt}</td><td>${timeTxt}</td></tr>`;
             });
             html += `</tbody></table>`;
 
             if (data.editHistory && data.editHistory.length > 0) {
-                html += `<h3 style="margin-top:30px; font-family: sans-serif; font-size: 16px;">История изменений ведомости (Офис):</h3><table class="print-table" style="margin-top: 10px;"><thead><tr><th>№</th><th>Дата и Время</th><th>Сотрудник</th><th>Добавлены</th><th>Удалены</th><th>Изменено кол-во мест</th></tr></thead><tbody>`;
+                html += `<h3 style="margin-top:30px; font-family: sans-serif; font-size: 16px;">${t('pdf_hist')}</h3><table class="print-table" style="margin-top: 10px;"><thead><tr><th>№</th><th>Date / Time</th><th>User</th><th>Added</th><th>Removed</th><th>Changed</th></tr></thead><tbody>`;
                 data.editHistory.forEach((log, index) => {
                     let logTime = new Date(log.editedAt); let formattedLogTime = logTime.toLocaleDateString('ru-RU') + " " + logTime.toLocaleTimeString('ru-RU', { hour12: false });
                     let addedText = log.added && log.added.length > 0 ? log.added.join(', ') : '-'; let removedText = log.removed && log.removed.length > 0 ? log.removed.join(', ') : '-'; let changedText = log.changed && log.changed.length > 0 ? log.changed.join(', ') : '-';
@@ -1110,7 +1096,7 @@
             }
 
             if (data.errors && data.errors.length > 0) {
-                html += `<h3 style="margin-top:30px; color: red; font-family: sans-serif; font-size: 16px;">Ошибочные сканирования (лишние номера):</h3><table class="print-table" style="margin-top: 10px;"><thead><tr><th>№</th><th>Отсканированный код</th><th>Тип ошибки</th><th>Сотрудник</th><th>Время скана</th></tr></thead><tbody>`;
+                html += `<h3 style="margin-top:30px; color: red; font-family: sans-serif; font-size: 16px;">${t('pdf_err_hist')}</h3><table class="print-table" style="margin-top: 10px;"><thead><tr><th>№</th><th>Code</th><th>Error</th><th>User</th><th>Time</th></tr></thead><tbody>`;
                 data.errors.forEach((err, index) => {
                     let errTimeTxt = "-"; if (err.scannedAt) { const dt = new Date(err.scannedAt); errTimeTxt = dt.toLocaleDateString('ru-RU') + " " + dt.toLocaleTimeString('ru-RU', { hour12: false }); }
                     html += `<tr><td>${index + 1}</td><td>${err.code}</td><td>${err.message}</td><td>${err.scannedBy}</td><td>${errTimeTxt}</td></tr>`;
@@ -1118,10 +1104,9 @@
                 html += `</tbody></table>`;
             }
 
-            html += `<div class="signature-block"><div><p>Сдал (Склад): _______________________</p></div><div><p>Принял (Водитель): _______________________</p></div></div>`;
+            html += `<div class="signature-block"><div><p>${t('pdf_sign1')}</p></div><div><p>${t('pdf_sign2')}</p></div></div>`;
             document.getElementById('print-area').innerHTML = html; document.getElementById('print-area').classList.remove('hidden'); window.print();
         }
-
         window.onafterprint = function() { document.getElementById('print-area').classList.add('hidden'); };
     </script>
 </body>
