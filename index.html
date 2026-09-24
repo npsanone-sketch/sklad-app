@@ -211,7 +211,6 @@
                     <span class="text-lg md:text-xl font-bold dark:text-white" id="scan-car-number">АВТОМОБІЛЬ</span>
                     <span id="scan-doc-type" class="ml-2 text-xs md:text-sm px-2 py-1 rounded font-bold shadow-sm hidden md:inline-block"></span>
                 </div>
-                <!-- Кнопки Офісу і Завершення -->
                 <button id="btn-add-pallets" onclick="showAddPalletsForm()" class="hidden bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded font-bold text-sm shadow" data-i18n="btn_add_pallets">➕ Додати палети</button>
                 <button id="btn-finish-transfer" onclick="finishShiftTransfer()" class="hidden bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-bold text-sm shadow animate-pulse" data-i18n="finish_transfer_btn">🔒 Завершити звірку</button>
             </div>
@@ -315,7 +314,7 @@
                 pdf_hist: 'Історія змін (Офіс):', pdf_err_hist: 'Помилкові сканування (Зайві номери):',
                 pdf_sign1: 'Здав: _______________________', pdf_sign2: 'Прийняв: _______________________',
                 time_min: 'хв', time_h: 'год', time_sec: 'сек', empty_stats: 'Немає даних',
-                finish_transfer_btn: '🔒 Завершити зміну', confirm_transfer: 'Ви впевнені, що хочете закрити зміну?\nПісля цього сканувати буде неможливо!', missing_items: 'Не вистачає палет', msg_locked: '🔒 ЗМІНУ ЗАКРИТО (СКАНИ НЕ ПРИЙМАЮТЬСЯ)',
+                finish_transfer_btn: '🔒 Завершити зміну', confirm_transfer: 'Ви впевнені, що хочете закрити зміну?\nПісля цього сканувати буде неможливо!', missing_items: 'Не вистачає палет за планом', msg_locked: '🔒 ЗМІНУ ЗАКРИТО (СКАНИ НЕ ПРИЙМАЮТЬСЯ)',
                 delete: 'Видалити', confirm_delete_pallet: 'Точно видалити палету', deleted: 'Видалено', add_pallets_title: 'Додати палети до фури', btn_add_pallets: '➕ Додати палети'
             },
             pl: {
@@ -341,7 +340,7 @@
                 pdf_hist: 'Historia zmian:', pdf_err_hist: 'Błędne skanowania:',
                 pdf_sign1: 'Przekazał: ___________________', pdf_sign2: 'Odebrał: ___________________',
                 time_min: 'min', time_h: 'g', time_sec: 'sek', empty_stats: 'Brak danych',
-                finish_transfer_btn: '🔒 Zakończ zmianę', confirm_transfer: 'Czy na pewno chcesz zamknąć zmianę?\nSkanowanie nie będzie możliwe!', missing_items: 'Brakuje palet', msg_locked: '🔒 ZAMKNIĘTO (SKANOWANIE ZABLOKOWANE)',
+                finish_transfer_btn: '🔒 Zakończ zmianę', confirm_transfer: 'Czy na pewno chcesz zamknąć zmianę?\nSkanowanie nie będzie możliwe!', missing_items: 'Brakuje palet wg planu', msg_locked: '🔒 ZAMKNIĘTO (SKANOWANIE ZABLOKOWANE)',
                 delete: 'Usuń', confirm_delete_pallet: 'Na pewno usunąć paletę', deleted: 'Usunięto', add_pallets_title: 'Dodaj palety do pojazdu', btn_add_pallets: '➕ Dodaj palety'
             },
             en: {
@@ -367,7 +366,7 @@
                 pdf_hist: 'Change History:', pdf_err_hist: 'Error History:',
                 pdf_sign1: 'Handed over: ___________________', pdf_sign2: 'Accepted: ___________________',
                 time_min: 'min', time_h: 'h', time_sec: 'sec', empty_stats: 'No data',
-                finish_transfer_btn: '🔒 Finish Transfer', confirm_transfer: 'Are you sure you want to close the shift transfer?\nFurther scanning will be disabled!', missing_items: 'Missing pallets', msg_locked: '🔒 LOCKED (SCANNING DISABLED)',
+                finish_transfer_btn: '🔒 Finish Transfer', confirm_transfer: 'Are you sure you want to close the shift transfer?\nFurther scanning will be disabled!', missing_items: 'Missing pallets from plan', msg_locked: '🔒 LOCKED (SCANNING DISABLED)',
                 delete: 'Delete', confirm_delete_pallet: 'Confirm delete pallet', deleted: 'Deleted', add_pallets_title: 'Add pallets to vehicle', btn_add_pallets: '➕ Add pallets'
             }
         };
@@ -582,14 +581,15 @@
                     data.items.forEach(i => {
                         if (i.status === 'removed') return;
                         let t = i.totalPlaces || 1; let s = i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? t : 0);
-                        cPlaces += t;
+                        if (!i.isExcess) cPlaces += t; 
+                        
                         if (!i.isCancelled) {
                             cScanned += s; palletsScanned += s;
                             if (s > 0 && i.scannedBy) userScans[i.scannedBy] = (userScans[i.scannedBy] || 0) + s;
                         } else { if (s > 0) cancels++; }
                         if (i.scannedAt && !i.isCancelled) { let scanDt = new Date(i.scannedAt); if (!lastScanTime || scanDt > lastScanTime) lastScanTime = scanDt; }
                     });
-                    if (cPlaces > 0 && cScanned === cPlaces) { carsDone++; if (lastScanTime) durations.push((lastScanTime - dt) / 1000 / 60); }
+                    if (cPlaces > 0 && cScanned >= cPlaces) { carsDone++; if (lastScanTime) durations.push((lastScanTime - dt) / 1000 / 60); }
                     if (data.errors) {
                         errorsCount += data.errors.length;
                         data.errors.forEach(e => { if (e.scannedBy) userErrors[e.scannedBy] = (userErrors[e.scannedBy] || 0) + 1; });
@@ -714,7 +714,6 @@
 
         async function deleteManifest(event, id) { event.stopPropagation(); if (!isAdmin) return; if (confirm("Delete?")) await db.collection('manifests').doc(id).delete(); }
 
-        // --- ВНУТРІШНЄ ДОДАВАННЯ ПАЛЕТ (НОВЕ) ---
         function showAddPalletsForm() {
             document.getElementById('add-pallets-list').value = '';
             document.getElementById('add-pallets-counter').innerText = t('modal_counter_empty');
@@ -765,7 +764,6 @@
             } catch(e) { alert("Error: " + e.message); }
         }
 
-        // --- ВНУТРІШНЄ ВИДАЛЕННЯ ПАЛЕТИ ---
         async function deletePalletItem(code, event) {
             event.stopPropagation();
             if (!confirm(`${t('confirm_delete_pallet')} ${code}?`)) return;
@@ -778,9 +776,9 @@
                 for (let i = 0; i < items.length; i++) {
                     if (items[i].code === code && items[i].status !== 'removed') {
                         if (items[i].scannedPlaces > 0) {
-                            items[i].isCancelled = true; // Сценарій Б: Вже відскановано, треба повернути (мигає червоним)
+                            items[i].isCancelled = true; 
                         } else {
-                            items[i].status = 'removed'; // Сценарій А: Ще не скановано, просто видаляємо
+                            items[i].status = 'removed'; 
                         }
                         found = true; break;
                     }
@@ -793,6 +791,9 @@
             } catch(e) { alert(e.message); }
         }
 
+        // ==========================================
+        // ІДЕАЛЬНА МАТЕМАТИКА НА ДАШБОРДІ
+        // ==========================================
         function loadDashboard() {
             window.currentActivity = "Смотрит Главный экран"; updatePresence();
             if (unsubscribeManifests) unsubscribeManifests();
@@ -825,11 +826,21 @@
 
                     data.items.forEach(i => {
                         if (i.isCancelled && i.scannedPlaces > 0) { needsReturn = true; returnList.push(`${i.code} (${i.scannedPlaces})`); }
-                        if (i.status !== 'removed') { totalPlaces += (i.totalPlaces || 1); scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0)); }
+                        if (i.status !== 'removed') { 
+                            let t = i.totalPlaces || 1;
+                            let s = i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? t : 0);
+                            
+                            if (i.isExcess) {
+                                scannedPlaces += s; // Надлишок іде ТІЛЬКИ в відскановане, план не збільшує
+                            } else {
+                                totalPlaces += t; 
+                                scannedPlaces += s;
+                            }
+                        }
                         if (i.scannedAt && !i.isCancelled) { let dt = new Date(i.scannedAt); if (!lastScanDt || dt > lastScanDt) lastScanDt = dt; }
                     });
 
-                    const isCompleted = (totalPlaces > 0 && scannedPlaces === totalPlaces) || data.locked;
+                    const isCompleted = (totalPlaces > 0 && scannedPlaces >= totalPlaces) || data.locked;
                     let durationHtml = '';
                     if (isCompleted && data.createdAt && lastScanDt && !needsReturn && docType !== 'transfer') {
                         let diffSecs = Math.floor((lastScanDt - docDate) / 1000);
@@ -872,7 +883,8 @@
                         returnAlertHtml = `<div class="mt-3 bg-red-600 text-white p-2 rounded shadow-inner border border-red-800"><div class="text-sm font-bold mb-1">${t('alert_return')}</div><div class="font-mono text-xs leading-tight">${returnList.join(', ')}</div></div>`;
                     }
 
-                    const percent = totalPlaces > 0 ? (scannedPlaces / totalPlaces) * 100 : 0;
+                    // Прогрес бар ніколи не вилізе за рамки 100%, навіть якщо відсканували купу зайвого
+                    const percent = totalPlaces > 0 ? Math.min((scannedPlaces / totalPlaces) * 100, 100) : 0;
                     const hasUnread = data.messages && data.messages.length > 0 && (!data.readBy || !data.readBy.includes(currentUser.email));
                     const chatBadge = hasUnread ? `<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>` : '';
 
@@ -912,31 +924,53 @@
             }
         }
 
+        // ==========================================
+        // ІДЕАЛЬНА МАТЕМАТИКА ДЛЯ TELEGRAM
+        // ==========================================
         async function finishShiftTransfer() {
             if (!currentManifestDoc || currentManifestDoc.locked) return;
             const data = currentManifestDoc;
-            let total = 0, scanned = 0, missing = [];
+            
+            let planTotal = 0, planScanned = 0, excessTotal = 0, missing = [], excessArr = [];
+            
             data.items.forEach(i => {
                 if (i.status === 'removed') return;
-                let t = i.totalPlaces || 1; let s = i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? t : 0);
-                total += t; scanned += s;
-                if (s < t && !i.isExcess) missing.push(`${i.code} (${t - s} шт)`);
+                let t = i.totalPlaces || 1; 
+                let s = i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? t : 0);
+                
+                if (i.isExcess) {
+                    excessTotal += s;
+                    excessArr.push(`${i.code} (${s} шт)`);
+                } else {
+                    planTotal += t;
+                    planScanned += s;
+                    if (s < t) missing.push(`${i.code} (${t - s} шт)`);
+                }
             });
 
-            if (confirm(t('confirm_transfer') + `\n\n${t('missing_items')}: ${missing.length}`)) {
+            let confirmMsg = t('confirm_transfer') + `\n\nНе вистачає за планом: ${missing.length}\nНадлишок: ${excessArr.length}`;
+            if (confirm(confirmMsg)) {
                 try {
                     await db.collection('manifests').doc(currentScanId).update({ locked: true, status: 'completed' });
                     
                     let dateStr = new Date().toLocaleDateString('ru-RU');
                     let msg = `🚨 <b>Передача зміни: ${data.carNumber}</b>\n`;
                     msg += `📅 Дата: ${dateStr}\n👤 Відповідальний: ${currentUser.email}\n\n`;
-                    msg += `📦 За планом: ${total} шт\n✅ Знайдено: ${scanned} шт\n`;
+                    msg += `📦 За планом: ${planTotal} шт\n`;
+                    msg += `✅ Знайдено за планом: ${planScanned} шт\n`;
+                    
+                    if (excessTotal > 0) {
+                        msg += `\n➕ <b>ЗНАЙДЕНО ЗАЙВИХ (Надлишок): ${excessTotal} шт</b>\n`;
+                        excessArr.forEach(e => msg += `- ${e}\n`);
+                    }
+                    
                     if (missing.length > 0) {
                         msg += `\n❌ <b>НЕ ЗНАЙДЕНО (${missing.length}):</b>\n`;
                         missing.forEach(m => msg += `- ${m}\n`);
                     } else {
                         msg += `\n✅ <b>Недостачі немає, зміна прийнята успішно.</b>`;
                     }
+                    
                     sendTelegramMessage(msg);
                     
                 } catch(e) { alert("Error: " + e.message); }
@@ -985,7 +1019,10 @@
                     data.items.forEach(item => {
                         const iTotal = item.totalPlaces || 1; const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
                         
-                        if (!item.isCancelled && item.status !== 'removed') { totalPlaces += iTotal; scannedPlaces += iScanned; } 
+                        if (!item.isCancelled && item.status !== 'removed') { 
+                            if (item.isExcess) { scannedPlaces += iScanned; } 
+                            else { totalPlaces += iTotal; scannedPlaces += iScanned; }
+                        } 
                         else if (item.isCancelled && iScanned > 0) { returns.push(`${item.code} (${iScanned})`); }
                         
                         let liClass, icon, specialBadge = '';
@@ -1008,6 +1045,10 @@
                             liClass = 'bg-yellow-50 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-400 border-2'; icon = '🔄'; 
                         } else { 
                             liClass = 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 border-2'; icon = '⏳'; 
+                        }
+                        
+                        if (item.isExcess) {
+                            liClass = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-100 border-yellow-500 border-2'; icon = '➕';
                         }
                         
                         let timeHtml = ''; if (item.scannedAt && !item.isCancelled && item.status !== 'removed') { const dt = new Date(item.scannedAt); timeHtml = `<span class="text-xs text-blue-700 dark:text-blue-400 ml-2 font-bold">${dt.toLocaleTimeString('ru-RU')}</span>`; }
@@ -1155,10 +1196,19 @@
             else if (docType === 'unload') { actionVerb = t('badge_unload'); itemVerb = t('word_unloaded'); } 
             else { actionVerb = t('pdf_transfer'); itemVerb = t('word_checked'); }
             
-            let totalPlaces = 0, scannedPlaces = 0, lastScanDt = null;
+            let planTotal = 0, planScanned = 0, lastScanDt = null;
             data.items.forEach(i => {
                 if (i.status === 'removed') return;
-                totalPlaces += (i.totalPlaces || 1); scannedPlaces += (i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? (i.totalPlaces || 1) : 0));
+                let t = i.totalPlaces || 1;
+                let s = i.scannedPlaces !== undefined ? i.scannedPlaces : (i.status === 'scanned' ? t : 0);
+                
+                if (!i.isExcess) {
+                    planTotal += t; 
+                    planScanned += s;
+                } else {
+                    planScanned += s;
+                }
+
                 if (i.scannedAt && !i.isCancelled) { let dt = new Date(i.scannedAt); if (!lastScanDt || dt > lastScanDt) lastScanDt = dt; }
             });
             
@@ -1174,7 +1224,7 @@
                 }
             }
 
-            let html = `<div style="text-align: center; margin-bottom: 20px;"><h1 style="font-size: 24px; font-family: sans-serif; margin-bottom: 5px;">${t('pdf_act')} ${actionVerb}</h1><p style="font-size: 18px; font-weight: bold; margin: 0;">${t('pdf_car')} ${data.carNumber}</p></div><div style="display: flex; justify-content: space-between; font-family: sans-serif; font-size: 14px; margin-bottom: 20px; background: #f3f4f6; padding: 10px; border-radius: 5px;"><div><p style="margin: 3px 0;"><strong>${t('pdf_created')}</strong> ${createdStr}</p><p style="margin: 3px 0;"><strong>${t('pdf_author')}</strong> ${data.creatorEmail}</p><p style="margin: 3px 0;"><strong>${t('pdf_last_scan')}</strong> ${lastScanStr}</p></div><div style="text-align: right;"><p style="margin: 3px 0; font-size: 16px;"><strong>${t('pdf_time')} <span style="color: #1d4ed8;">${durationStr}</span></strong></p><p style="margin: 3px 0; font-size: 16px;"><strong>${t('pdf_total')}</strong> ${itemVerb} ${scannedPlaces} / ${totalPlaces} ${t('pdf_places')}</p></div></div><table class="print-table"><thead><tr><th>${t('pdf_th1')}</th><th>${t('pdf_th2')}</th><th>${t('pdf_th3')}</th><th>${t('pdf_th4')}</th><th>${t('pdf_th5')}</th><th>${t('pdf_th6')}</th><th>${t('pdf_th7')}</th><th>${t('pdf_th8')}</th></tr></thead><tbody>`;
+            let html = `<div style="text-align: center; margin-bottom: 20px;"><h1 style="font-size: 24px; font-family: sans-serif; margin-bottom: 5px;">${t('pdf_act')} ${actionVerb}</h1><p style="font-size: 18px; font-weight: bold; margin: 0;">${t('pdf_car')} ${data.carNumber}</p></div><div style="display: flex; justify-content: space-between; font-family: sans-serif; font-size: 14px; margin-bottom: 20px; background: #f3f4f6; padding: 10px; border-radius: 5px;"><div><p style="margin: 3px 0;"><strong>${t('pdf_created')}</strong> ${createdStr}</p><p style="margin: 3px 0;"><strong>${t('pdf_author')}</strong> ${data.creatorEmail}</p><p style="margin: 3px 0;"><strong>${t('pdf_last_scan')}</strong> ${lastScanStr}</p></div><div style="text-align: right;"><p style="margin: 3px 0; font-size: 16px;"><strong>${t('pdf_time')} <span style="color: #1d4ed8;">${durationStr}</span></strong></p><p style="margin: 3px 0; font-size: 16px;"><strong>${t('pdf_total')}</strong> ${itemVerb} ${planScanned} / ${planTotal} ${t('pdf_places')}</p></div></div><table class="print-table"><thead><tr><th>${t('pdf_th1')}</th><th>${t('pdf_th2')}</th><th>${t('pdf_th3')}</th><th>${t('pdf_th4')}</th><th>${t('pdf_th5')}</th><th>${t('pdf_th6')}</th><th>${t('pdf_th7')}</th><th>${t('pdf_th8')}</th></tr></thead><tbody>`;
             let idx = 1;
             data.items.forEach((item) => {
                 const iTotal = item.totalPlaces || 1; const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
