@@ -14,6 +14,7 @@
         @keyframes flashGreen { 0% { background-color: #22c55e; } 100% { background-color: transparent; } }
         @keyframes flashRed { 0% { background-color: #ef4444; } 100% { background-color: transparent; } }
         @keyframes flashOrange { 0% { background-color: #f97316; } 100% { background-color: transparent; } }
+        @keyframes flashYellow { 0% { background-color: #fde047; } 100% { background-color: transparent; } }
         @keyframes urgentBlink {
             0%, 100% { box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.8); border-color: #ef4444; background-color: #fef2f2; transform: scale(1.02); }
             50% { box-shadow: none; border-color: #d1d5db; background-color: #ffffff; transform: scale(1); }
@@ -22,6 +23,7 @@
         .flash-green { animation: flashGreen 1s ease-out; }
         .flash-red { animation: flashRed 2s ease-out; }
         .flash-orange { animation: flashOrange 1s ease-out; }
+        .flash-yellow { animation: flashYellow 1.5s ease-out; }
         .urgent-blink { animation: urgentBlink 1.5s infinite; border-width: 4px; }
         
         .expanded-list { position: absolute !important; inset: 0 !important; z-index: 40 !important; width: 100% !important; max-width: 100% !important; height: 100% !important; }
@@ -102,12 +104,12 @@
         <button onclick="changeDate(1)" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 font-bold text-sm shadow-sm transition"><span data-i18n="next">Наступний</span> &rarr;</button>
     </div>
 
-    <!-- Головний екран (Дашборд ведомостей) -->
+    <!-- Головний екран -->
     <div id="dashboard-screen" class="flex-1 overflow-auto p-4 hidden no-print relative">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h2 class="text-2xl font-bold text-gray-700 dark:text-gray-200" id="dashboard-title" data-i18n="manifests_title">Відомості на день</h2>
             <button id="create-btn" onclick="showCreateForm()" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow-md w-full sm:w-auto transition transform hover:scale-105" data-i18n="create_btn">
-                + Створити відомість
+                + Додати/Змінити відомість
             </button>
         </div>
         <div id="manifests-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
@@ -264,21 +266,23 @@
 
     <script>
         const TELEGRAM_BOT_TOKEN = '8740839645:AAGcJeWS79f1Y3mcKAastQbu8pd6SJopt1E'; 
-        const TELEGRAM_CHAT_ID = '-4634875558';
+        const TELEGRAM_CHAT_IDS = ['-4634875558', '-4136268251']; // Обидві групи
 
         function sendTelegramMessage(text) {
             if (TELEGRAM_BOT_TOKEN === 'YOUR_BOT_TOKEN_HERE') return;
-            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: text, parse_mode: 'HTML' })
-            }).catch(e => console.error("Помилка відправки Telegram", e));
+            TELEGRAM_CHAT_IDS.forEach(chatId => {
+                fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML' })
+                }).catch(e => console.error("Помилка відправки Telegram", e));
+            });
         }
 
         const dict = {
             ua: {
                 login_title: 'Вхід у систему', email: 'Електронна пошта', password: 'Пароль', login_btn: 'Увійти', login_error: 'Помилка входу!',
                 analytics: 'Аналітика', online: 'В мережі:', active_now: 'Активні зараз', logout: 'Вийти',
-                prev: 'Попередній', next: 'Наступний', manifests_title: 'Відомості на день', create_btn: '+ Створити відомість',
+                prev: 'Попередній', next: 'Наступний', manifests_title: 'Відомості на день', create_btn: '+ Додати/Змінити відомість',
                 analytics_title: '📊 Панель аналітики', back_to_manifests: 'До відомостей', today: 'Сьогодні', yesterday: 'Вчора', week: '7 днів', month: '30 днів',
                 stat_cars: 'Документи', stat_cars_sub: 'Готово / В роботі', stat_pallets: 'Палети', stat_pallets_sub: 'Успішно відскановано', stat_time: 'Середній час', stat_time_sub: 'На обробку одного', stat_qc: 'Контроль якості', stat_cancels_prefix: 'Скасувань:',
                 rating_top: 'Рейтинг (Палети)', rating_anti: 'Антирейтинг (Помилки)',
@@ -287,23 +291,24 @@
                 back: 'Назад', focus_scanner: 'Повернути фокус сканеру', expand_list: 'Розгорнути список для звірки', collapse_list: 'ЗАВЕРШИТИ ЗВІРКУ (До сканеру)',
                 chat_title: 'Чат', chat_q1: '📦 Вантаж пошкоджено', chat_q2: '🛑 Немає місця в авто', chat_q3: '❓ Штрих-код не читається', chat_q4: '✅ Обробку завершено',
                 error_big: 'ПОМИЛКА!', close: 'ЗАКРИТИ', 
-                badge_load: 'ЗАВАНТАЖЕННЯ', badge_unload: 'ВИВАНТАЖЕННЯ', badge_transfer: 'ПЕРЕДАЧА ЗМІНИ', badge_changed: '⚠️ ЗМІНЕНО', badge_locked: '🔒 ЗАКРИТО',
+                badge_load: 'ЗАВАНТАЖЕННЯ', badge_unload: 'ВИВАНТАЖЕННЯ', badge_transfer: 'ПЕРЕДАЧА ЗМІНИ', badge_changed: '⚠️ ЗМІНЕНО', badge_locked: '🔒 ЗАКРИТО', badge_excess: 'НАДЛИШОК',
                 word_loaded: 'завантажено', word_unloaded: 'вивантажено', word_checked: 'перевірено',
                 err_repeat: 'ВЖЕ ОБРОБЛЕНО!', err_alien: 'ЧУЖИЙ ВАНТАЖ!',
-                flash_return: 'ПОВЕРНЕННЯ:', flash_left_return: 'Залишилось повернути:', flash_done: 'ГОТОВО', flash_process: 'В ПРОЦЕСІ', flash_weight: 'Вага (B/N):', flash_missing: 'НЕДОСТАЧА',
+                flash_return: 'ПОВЕРНЕННЯ:', flash_left_return: 'Залишилось повернути:', flash_done: 'ГОТОВО', flash_process: 'В ПРОЦЕСІ', flash_weight: 'Вага (B/N):', flash_missing: 'НЕДОСТАЧА', flash_excess: 'ЗНАЙДЕНО ЗАЙВУ ПАЛЕТУ (НАДЛИШОК)',
                 alert_return: '⚠️ УВАГА, ЗМІНИ! ТРЕБА ПОВЕРНУТИ:', role_office: 'Офіс', role_warehouse: 'Склад',
                 pdf_act: 'АКТ', pdf_car: 'Авто/Зміна:', pdf_created: 'Створено (Офіс):', pdf_author: 'Автор:', pdf_last_scan: 'Останній скан:', pdf_time: 'Час обробки:', pdf_total: 'Підсумок:', pdf_places: 'місць', pdf_transfer: 'ПЕРЕДАЧІ ЗМІНИ',
                 pdf_th1: '№', pdf_th2: 'Код', pdf_th3: 'Місця', pdf_th4: 'Brutto', pdf_th5: 'Netto', pdf_th6: 'PCS', pdf_th7: 'Статус', pdf_th8: 'Час скану',
-                pdf_s_err: '⚠️ ПОМИЛКА (ПОВЕРНУТИ)', pdf_s_part: 'ЧАСТКОВО', pdf_s_wait: 'ОЧІКУЄ', pdf_s_missing: '❌ НЕ ЗНАЙДЕНО',
+                pdf_s_err: '⚠️ ПОМИЛКА (ПОВЕРНУТИ)', pdf_s_part: 'ЧАСТКОВО', pdf_s_wait: 'ОЧІКУЄ', pdf_s_missing: '❌ НЕ ЗНАЙДЕНО', pdf_s_excess: '➕ НАДЛИШОК',
                 pdf_hist: 'Історія змін (Офіс):', pdf_err_hist: 'Помилкові сканування (Зайві номери):',
                 pdf_sign1: 'Здав: _______________________', pdf_sign2: 'Прийняв: _______________________',
                 time_min: 'хв', time_h: 'год', time_sec: 'сек', empty_stats: 'Немає даних',
-                finish_transfer_btn: '🔒 Завершити зміну', confirm_transfer: 'Ви впевнені, що хочете закрити зміну?\nПісля цього сканувати буде неможливо!', missing_items: 'Не вистачає палет', msg_locked: '🔒 ЗМІНУ ЗАКРИТО (СКАНИ НЕ ПРИЙМАЮТЬСЯ)'
+                finish_transfer_btn: '🔒 Завершити зміну', confirm_transfer: 'Ви впевнені, що хочете закрити зміну?\nПісля цього сканувати буде неможливо!', missing_items: 'Не вистачає палет', msg_locked: '🔒 ЗМІНУ ЗАКРИТО (СКАНИ НЕ ПРИЙМАЮТЬСЯ)',
+                delete: 'Видалити', confirm_delete_pallet: 'Точно видалити палету'
             },
             pl: {
                 login_title: 'Logowanie', email: 'Adres e-mail', password: 'Hasło', login_btn: 'Zaloguj się', login_error: 'Błąd logowania!',
                 analytics: 'Analityka', online: 'Dostępni:', active_now: 'Aktywni teraz', logout: 'Wyloguj',
-                prev: 'Poprzedni', next: 'Następny', manifests_title: 'Listy na dziś', create_btn: '+ Utwórz listę',
+                prev: 'Poprzedni', next: 'Następny', manifests_title: 'Listy na dziś', create_btn: '+ Dodaj/Zmień listę',
                 analytics_title: '📊 Panel analityczny', back_to_manifests: 'Do list', today: 'Dzisiaj', yesterday: 'Wczoraj', week: '7 dni', month: '30 dni',
                 stat_cars: 'Dokumenty', stat_cars_sub: 'Gotowe / W pracy', stat_pallets: 'Palety', stat_pallets_sub: 'Zeskanowane pomyślnie', stat_time: 'Średni czas', stat_time_sub: 'Przetwarzanie', stat_qc: 'Kontrola jakości', stat_cancels_prefix: 'Anulacje:',
                 rating_top: 'Ranking (Palety)', rating_anti: 'Anty-ranking (Błędy)',
@@ -312,23 +317,24 @@
                 back: 'Wróć', focus_scanner: 'Fokus na skaner', expand_list: 'Rozwiń listę do weryfikacji', collapse_list: 'ZAKOŃCZ WERYFIKACJĘ',
                 chat_title: 'Czat', chat_q1: '📦 Towar uszkodzony', chat_q2: '🛑 Brak miejsca', chat_q3: '❓ Kod nieczytelny', chat_q4: '✅ Gotowe',
                 error_big: 'BŁĄD!', close: 'ZAMKNIJ',
-                badge_load: 'ZAŁADUNEK', badge_unload: 'ROZŁADUNEK', badge_transfer: 'PRZEKAZANIE ZMIANY', badge_changed: '⚠️ ZMIENIONO', badge_locked: '🔒 ZAMKNIĘTO',
+                badge_load: 'ZAŁADUNEK', badge_unload: 'ROZŁADUNEK', badge_transfer: 'PRZEKAZANIE ZMIANY', badge_changed: '⚠️ ZMIENIONO', badge_locked: '🔒 ZAMKNIĘTO', badge_excess: 'NADMIAR',
                 word_loaded: 'załadowano', word_unloaded: 'rozładowano', word_checked: 'sprawdzono',
                 err_repeat: 'JUŻ PRZETWORZONO!', err_alien: 'OBCY TOWAR!',
-                flash_return: 'ZWROT:', flash_left_return: 'Do zwrotu:', flash_done: 'GOTOWE', flash_process: 'W TRAKCIE', flash_weight: 'Waga (B/N):', flash_missing: 'BRAK',
+                flash_return: 'ZWROT:', flash_left_return: 'Do zwrotu:', flash_done: 'GOTOWE', flash_process: 'W TRAKCIE', flash_weight: 'Waga (B/N):', flash_missing: 'BRAK', flash_excess: 'ZNALEZIONO NADMIAROWĄ PALETĘ',
                 alert_return: '⚠️ UWAGA! NALEŻY ZWRÓCIĆ:', role_office: 'Biuro', role_warehouse: 'Magazyn',
                 pdf_act: 'AKT', pdf_car: 'Pojazd/Zmiana:', pdf_created: 'Utworzono (Biuro):', pdf_author: 'Autor:', pdf_last_scan: 'Ostatni skan:', pdf_time: 'Czas:', pdf_total: 'Suma:', pdf_places: 'miejsc', pdf_transfer: 'PRZEKAZANIA ZMIANY',
                 pdf_th1: 'Nr', pdf_th2: 'Kod', pdf_th3: 'Miejsca', pdf_th4: 'Brutto', pdf_th5: 'Netto', pdf_th6: 'Szt', pdf_th7: 'Status', pdf_th8: 'Czas skanu',
-                pdf_s_err: '⚠️ BŁĄD (ZWRÓCIĆ)', pdf_s_part: 'CZĘŚCIOWO', pdf_s_wait: 'OCZEKUJE', pdf_s_missing: '❌ BRAK',
+                pdf_s_err: '⚠️ BŁĄD (ZWRÓCIĆ)', pdf_s_part: 'CZĘŚCIOWO', pdf_s_wait: 'OCZEKUJE', pdf_s_missing: '❌ BRAK', pdf_s_excess: '➕ NADMIAR',
                 pdf_hist: 'Historia zmian:', pdf_err_hist: 'Błędne skanowania:',
                 pdf_sign1: 'Przekazał: ___________________', pdf_sign2: 'Odebrał: ___________________',
                 time_min: 'min', time_h: 'g', time_sec: 'sek', empty_stats: 'Brak danych',
-                finish_transfer_btn: '🔒 Zakończ zmianę', confirm_transfer: 'Czy na pewno chcesz zamknąć zmianę?\nSkanowanie nie będzie możliwe!', missing_items: 'Brakuje palet', msg_locked: '🔒 ZAMKNIĘTO (SKANOWANIE ZABLOKOWANE)'
+                finish_transfer_btn: '🔒 Zakończ zmianę', confirm_transfer: 'Czy na pewno chcesz zamknąć zmianę?\nSkanowanie nie będzie możliwe!', missing_items: 'Brakuje palet', msg_locked: '🔒 ZAMKNIĘTO (SKANOWANIE ZABLOKOWANE)',
+                delete: 'Usuń', confirm_delete_pallet: 'Na pewno usunąć paletę'
             },
             en: {
                 login_title: 'Login', email: 'Email', password: 'Password', login_btn: 'Sign In', login_error: 'Login error!',
                 analytics: 'Analytics', online: 'Online:', active_now: 'Active Now', logout: 'Logout',
-                prev: 'Previous', next: 'Next', manifests_title: 'Daily Tasks', create_btn: '+ Create Task',
+                prev: 'Previous', next: 'Next', manifests_title: 'Daily Tasks', create_btn: '+ Add/Edit Task',
                 analytics_title: '📊 Analytics Dashboard', back_to_manifests: 'Back to Tasks', today: 'Today', yesterday: 'Yesterday', week: '7 days', month: '30 days',
                 stat_cars: 'Tasks', stat_cars_sub: 'Done / In progress', stat_pallets: 'Pallets', stat_pallets_sub: 'Successfully scanned', stat_time: 'Avg Time', stat_time_sub: 'Processing time', stat_qc: 'Quality Control', stat_cancels_prefix: 'Cancellations:',
                 rating_top: 'Top Performers', rating_anti: 'Anti-rating (Errors)',
@@ -337,18 +343,19 @@
                 back: 'Back', focus_scanner: 'Focus scanner', expand_list: 'Expand list for checking', collapse_list: 'FINISH CHECKING',
                 chat_title: 'Chat', chat_q1: '📦 Cargo damaged', chat_q2: '🛑 No space', chat_q3: '❓ Barcode unreadable', chat_q4: '✅ Processing done',
                 error_big: 'ERROR!', close: 'CLOSE',
-                badge_load: 'LOAD', badge_unload: 'UNLOAD', badge_transfer: 'SHIFT TRANSFER', badge_changed: '⚠️ CHANGED', badge_locked: '🔒 LOCKED',
+                badge_load: 'LOAD', badge_unload: 'UNLOAD', badge_transfer: 'SHIFT TRANSFER', badge_changed: '⚠️ CHANGED', badge_locked: '🔒 LOCKED', badge_excess: 'EXCESS',
                 word_loaded: 'loaded', word_unloaded: 'unloaded', word_checked: 'checked',
                 err_repeat: 'ALREADY SCANNED!', err_alien: 'WRONG CARGO!',
-                flash_return: 'RETURN:', flash_left_return: 'Left to return:', flash_done: 'DONE', flash_process: 'IN PROGRESS', flash_weight: 'Weight (B/N):', flash_missing: 'MISSING',
+                flash_return: 'RETURN:', flash_left_return: 'Left to return:', flash_done: 'DONE', flash_process: 'IN PROGRESS', flash_weight: 'Weight (B/N):', flash_missing: 'MISSING', flash_excess: 'EXCESS PALLET FOUND',
                 alert_return: '⚠️ ATTENTION! MUST RETURN:', role_office: 'Office', role_warehouse: 'Warehouse',
                 pdf_act: 'ACT', pdf_car: 'Vehicle/Shift:', pdf_created: 'Created:', pdf_author: 'Author:', pdf_last_scan: 'Last scan:', pdf_time: 'Time:', pdf_total: 'Total:', pdf_places: 'places', pdf_transfer: 'OF SHIFT TRANSFER',
                 pdf_th1: 'No.', pdf_th2: 'Code', pdf_th3: 'Places', pdf_th4: 'Gross', pdf_th5: 'Net', pdf_th6: 'PCS', pdf_th7: 'Status', pdf_th8: 'Scan Time',
-                pdf_s_err: '⚠️ ERROR (RETURN)', pdf_s_part: 'PARTIAL', pdf_s_wait: 'PENDING', pdf_s_missing: '❌ MISSING',
+                pdf_s_err: '⚠️ ERROR (RETURN)', pdf_s_part: 'PARTIAL', pdf_s_wait: 'PENDING', pdf_s_missing: '❌ MISSING', pdf_s_excess: '➕ EXCESS',
                 pdf_hist: 'Change History:', pdf_err_hist: 'Error History:',
                 pdf_sign1: 'Handed over: ___________________', pdf_sign2: 'Accepted: ___________________',
                 time_min: 'min', time_h: 'h', time_sec: 'sec', empty_stats: 'No data',
-                finish_transfer_btn: '🔒 Finish Transfer', confirm_transfer: 'Are you sure you want to close the shift transfer?\nFurther scanning will be disabled!', missing_items: 'Missing pallets', msg_locked: '🔒 LOCKED (SCANNING DISABLED)'
+                finish_transfer_btn: '🔒 Finish Transfer', confirm_transfer: 'Are you sure you want to close the shift transfer?\nFurther scanning will be disabled!', missing_items: 'Missing pallets', msg_locked: '🔒 LOCKED (SCANNING DISABLED)',
+                delete: 'Delete', confirm_delete_pallet: 'Confirm delete pallet'
             }
         };
 
@@ -684,7 +691,7 @@
             document.getElementById('modal-title').innerText = 'Редагування / Edit';
             document.getElementById('new-car-number').value = data.carNumber; document.getElementById('new-manifest-type').value = data.docType || 'load';
             document.getElementById('new-manifest-type').disabled = true; 
-            const text = data.items.filter(i => i.status !== 'removed').map(i => `${i.code}\t\t${i.totalPlaces} paleta\t\t${i.brutto}\t${i.netto}\t\t${i.pcs}`).join('\n');
+            const text = data.items.filter(i => i.status !== 'removed' && !i.isExcess).map(i => `${i.code}\t\t${i.totalPlaces} paleta\t\t${i.brutto}\t${i.netto}\t\t${i.pcs}`).join('\n');
             document.getElementById('new-manifests-list').value = text; document.getElementById('create-modal').classList.remove('hidden'); updateManifestCount();
         }
 
@@ -699,6 +706,9 @@
                     const docRef = db.collection('manifests').doc(editingManifestId); const docSnap = await docRef.get(); const data = docSnap.data();
                     const oldItems = data.items; let mergedItems = []; let addedLog = []; let removedLog = []; let changedLog = [];
                     oldItems.forEach(oldItem => {
+                        // Зберігаємо надлишки
+                        if (oldItem.isExcess && oldItem.status !== 'removed') { mergedItems.push(oldItem); return; }
+
                         const foundInNew = newItemsParsed.find(n => n.code === oldItem.code);
                         if (foundInNew) {
                             if (oldItem.totalPlaces !== foundInNew.totalPlaces) changedLog.push(`${oldItem.code} (${oldItem.totalPlaces} ➡️ ${foundInNew.totalPlaces} шт)`);
@@ -727,6 +737,30 @@
         }
 
         async function deleteManifest(event, id) { event.stopPropagation(); if (!isAdmin) return; if (confirm("Delete?")) await db.collection('manifests').doc(id).delete(); }
+
+        // --- ВНУТРІШНЄ ВИДАЛЕННЯ ПАЛЕТИ ---
+        async function deletePalletItem(code, event) {
+            event.stopPropagation();
+            if (!confirm(`${t('confirm_delete_pallet')} ${code}?`)) return;
+            try {
+                const docRef = db.collection('manifests').doc(currentScanId);
+                const docSnap = await docRef.get();
+                if (!docSnap.exists) return;
+                let data = docSnap.data(); let items = data.items; let found = false;
+                
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].code === code && items[i].status !== 'removed') {
+                        items[i].status = 'removed';
+                        found = true; break;
+                    }
+                }
+                if (found) {
+                    let editHistory = data.editHistory || [];
+                    editHistory.push({ editedAt: new Date().toISOString(), editedBy: currentUser.email, added: [], removed: [`${code} (Кошик/Trash)`], changed: [] });
+                    await docRef.update({ items: items, editHistory: editHistory, modified: true });
+                }
+            } catch(e) { alert(e.message); }
+        }
 
         function loadDashboard() {
             window.currentActivity = "Смотрит Главный экран"; updatePresence();
@@ -921,19 +955,35 @@
                         if (!item.isCancelled) { totalPlaces += iTotal; scannedPlaces += iScanned; } else if (iScanned > 0) { returns.push(`${item.code} (${iScanned})`); }
                         
                         let liClass, icon, specialBadge = '';
-                        if (item.isCancelled) { liClass = 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-100 border-red-500 border-2 animate-pulse'; icon = '⚠️'; specialBadge = `<span class="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">${t('flash_return')} ${iScanned}</span>`; } 
-                        else if (data.locked && iScanned < iTotal) { liClass = 'bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-400 border-2'; icon = '❌'; specialBadge = `<span class="text-xs font-bold bg-red-100 text-red-800 px-2 py-1 rounded border border-red-400">${t('flash_missing')}</span>`; }
-                        else if (iScanned === iTotal) { liClass = docType === 'load' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 opacity-70' : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-100 opacity-70'; icon = '✓'; } 
-                        else if (iScanned > 0 && iScanned < iTotal) { liClass = 'bg-yellow-50 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-400 border-2'; icon = '🔄'; } 
-                        else { liClass = 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 border-2'; icon = '⏳'; }
+                        if (item.isExcess) {
+                            specialBadge = `<span class="bg-yellow-400 text-yellow-900 px-2 py-1 rounded text-xs font-bold">${t('badge_excess')}</span>`;
+                        } else if (item.isCancelled) { 
+                            liClass = 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-100 border-red-500 border-2 animate-pulse'; icon = '⚠️'; specialBadge = `<span class="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">${t('flash_return')} ${iScanned}</span>`; 
+                        } else if (data.locked && iScanned < iTotal) { 
+                            liClass = 'bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-400 border-2'; icon = '❌'; specialBadge = `<span class="text-xs font-bold bg-red-100 text-red-800 px-2 py-1 rounded border border-red-400">${t('flash_missing')}</span>`; 
+                        } else if (iScanned === iTotal) { 
+                            liClass = docType === 'load' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 opacity-70' : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-100 opacity-70'; icon = '✓'; 
+                        } else if (iScanned > 0 && iScanned < iTotal) { 
+                            liClass = 'bg-yellow-50 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-400 border-2'; icon = '🔄'; 
+                        } else { 
+                            liClass = 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 border-2'; icon = '⏳'; 
+                        }
+                        
+                        if (item.isExcess) {
+                            liClass = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-100 border-yellow-500 border-2'; icon = '➕';
+                        }
                         
                         let timeHtml = ''; if (item.scannedAt && !item.isCancelled) { const dt = new Date(item.scannedAt); timeHtml = `<span class="text-xs text-blue-700 dark:text-blue-400 ml-2 font-bold">${dt.toLocaleTimeString('ru-RU')}</span>`; }
+
+                        let deleteBtn = isAdmin && !data.locked ? `<button onclick="deletePalletItem('${item.code}', event)" class="ml-2 text-red-500 hover:text-red-700 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded border border-red-200 dark:border-red-800" title="${t('delete')}">🗑️</button>` : '';
+
+                        let rightSide = item.isCancelled || (data.locked && iScanned < iTotal) || item.isExcess ? specialBadge : `<span class="text-xs font-bold bg-white dark:bg-gray-700 px-2 py-1 rounded opacity-80 border dark:border-gray-600">${iScanned}/${iTotal}</span>`;
 
                         listEl.innerHTML += `
                             <li class="p-2 rounded flex flex-col gap-1 ${liClass} transition-colors">
                                 <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2"><span class="font-bold">${icon}</span><span class="font-bold text-sm md:text-base ${item.isCancelled ? 'line-through' : ''}">${item.code}</span>${timeHtml}</div>
-                                    ${item.isCancelled || (data.locked && iScanned < iTotal) ? specialBadge : `<span class="text-xs font-bold bg-white dark:bg-gray-700 px-2 py-1 rounded opacity-80 border dark:border-gray-600">${iScanned}/${iTotal}</span>`}
+                                    <div class="flex items-center gap-2"><span class="font-bold">${icon}</span><span class="font-bold text-sm md:text-base ${item.isCancelled ? 'line-through' : ''}">${item.code}</span>${timeHtml}${deleteBtn}</div>
+                                    ${rightSide}
                                 </div>
                                 <div class="text-[10px] md:text-xs text-gray-600 dark:text-gray-300 font-mono ml-5">${t('flash_weight')} ${item.brutto}/${item.netto} | PCS: ${item.pcs}</div>
                             </li>`;
@@ -964,10 +1014,10 @@
             let alreadyScanned = false; let foundItem = null; let isUndoMode = false;
 
             for (let i = 0; i < items.length; i++) {
-                if (items[i].code === cleanCode) {
+                if (items[i].code === cleanCode && items[i].status !== 'removed') {
                     if (items[i].isCancelled && items[i].scannedPlaces > 0) {
                         items[i].scannedPlaces -= 1; items[i].scannedBy = currentUser.email; items[i].scannedAt = new Date().toISOString();
-                        if (items[i].scannedPlaces === 0) { items[i].status = 'removed'; items[i].isCancelled = false; }
+                        if (items[i].scannedPlaces === 0 && !items[i].isExcess) { items[i].status = 'removed'; items[i].isCancelled = false; }
                         foundItem = items[i]; isUndoMode = true; await docRef.update({ items: items }); showSuccessFlash(foundItem, true); return;
                     } else if (!items[i].isCancelled) {
                         const iTotal = items[i].totalPlaces || 1; const iScanned = items[i].scannedPlaces !== undefined ? items[i].scannedPlaces : (items[i].status === 'scanned' ? iTotal : 0);
@@ -977,20 +1027,39 @@
                             foundItem = items[i]; await docRef.update({ items: items }); showSuccessFlash(foundItem, false); return;
                         } else { alreadyScanned = true; }
                     }
+                    break;
                 }
             }
+
+            if (!foundItem && !alreadyScanned) {
+                const docType = data.docType || 'load';
+                if (docType === 'unload' || docType === 'transfer') {
+                    const newItem = { code: cleanCode, status: 'scanned', isCancelled: false, totalPlaces: 1, scannedPlaces: 1, scannedBy: currentUser.email, scannedAt: new Date().toISOString(), brutto: "-", netto: "-", pcs: "-", isExcess: true };
+                    items.push(newItem);
+                    await docRef.update({ items: items });
+                    showSuccessFlash(newItem, false, true); 
+                    return;
+                }
+            }
+
             const errorMsg = alreadyScanned ? `${t('err_repeat')} ${cleanCode}` : `${t('err_alien')} ${cleanCode}`;
             await docRef.update({ errors: firebase.firestore.FieldValue.arrayUnion({ code: cleanCode, message: errorMsg, scannedBy: currentUser.email, scannedAt: new Date().toISOString() }) });
             showErrorOverlay(errorMsg);
         }
 
-        function showSuccessFlash(item, isUndo) {
+        function showSuccessFlash(item, isUndo, isExcess = false) {
             playSuccessSound(); const area = document.getElementById('scan-flash-area');
-            area.className = `flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b dark:border-gray-700 md:border-b-0 md:border-r overflow-y-auto ${isUndo ? 'flash-orange' : 'flash-green'}`;
-            void area.offsetWidth; area.classList.add(isUndo ? 'flash-orange' : 'flash-green');
+            let flashClass = 'flash-green';
+            if (isUndo) flashClass = 'flash-orange';
+            if (isExcess) flashClass = 'flash-yellow';
+            
+            area.className = `flex-1 p-4 md:p-6 flex flex-col items-center justify-center transition-colors border-b dark:border-gray-700 md:border-b-0 md:border-r overflow-y-auto ${flashClass}`;
+            void area.offsetWidth; area.classList.add(flashClass);
             
             if (isUndo) {
                 document.getElementById('scan-last-result').innerHTML = `<div class="text-orange-600 font-bold text-2xl md:text-3xl">✔ ${t('flash_return')} ${item.code}</div><div class="text-gray-800 dark:text-gray-900 font-bold text-xl mt-2 bg-orange-200 inline-block px-4 py-1 rounded shadow-sm">${t('flash_left_return')} ${item.scannedPlaces}</div>`;
+            } else if (isExcess) {
+                document.getElementById('scan-last-result').innerHTML = `<div class="text-yellow-600 font-bold text-2xl md:text-3xl">⚠️ ${t('flash_excess')}</div><div class="text-gray-800 dark:text-gray-900 font-bold text-xl mt-2 bg-yellow-200 inline-block px-4 py-1 rounded shadow-sm">${item.code} (1 / 1)</div><div class="text-gray-600 dark:text-gray-300 font-bold text-lg mt-2">${t('word_checked')}</div>`;
             } else {
                 const isDone = item.scannedPlaces === (item.totalPlaces || 1); const statusText = isDone ? t('flash_done') : t('flash_process');
                 const isLoad = !currentManifestDoc.docType || currentManifestDoc.docType === 'load'; const actionColor = isLoad ? 'text-green-600' : 'text-orange-600';
@@ -1072,9 +1141,10 @@
                 if (item.status === 'removed') return; 
                 const iTotal = item.totalPlaces || 1; const iScanned = item.scannedPlaces !== undefined ? item.scannedPlaces : (item.status === 'scanned' ? iTotal : 0);
                 let statusTxt = "";
-                if (item.isCancelled) statusTxt = t('pdf_s_err'); else if (data.locked && iScanned < iTotal) statusTxt = t('pdf_s_missing'); else if (iScanned === iTotal) statusTxt = itemVerb.toUpperCase(); else if (iScanned > 0) statusTxt = t('pdf_s_part'); else statusTxt = t('pdf_s_wait');
+                if (item.isCancelled) statusTxt = t('pdf_s_err'); else if (data.locked && iScanned < iTotal) statusTxt = t('pdf_s_missing'); else if (item.isExcess) statusTxt = t('pdf_s_excess'); else if (iScanned === iTotal) statusTxt = itemVerb.toUpperCase(); else if (iScanned > 0) statusTxt = t('pdf_s_part'); else statusTxt = t('pdf_s_wait');
                 let timeTxt = "-"; if (item.scannedAt && !item.isCancelled) { const dt = new Date(item.scannedAt); timeTxt = dt.toLocaleDateString('ru-RU') + " " + dt.toLocaleTimeString('ru-RU', { hour12: false }); }
-                let colorStyle = (item.isCancelled || (data.locked && iScanned < iTotal)) ? 'color:red; font-weight:bold;' : '';
+                let colorStyle = (item.isCancelled || (data.locked && iScanned < iTotal) || item.isExcess) ? 'color:red; font-weight:bold;' : '';
+                if (item.isExcess) colorStyle = 'color:#b45309; font-weight:bold;'; // Yellow-brown for excess
                 html += `<tr><td>${idx++}</td><td style="${colorStyle}">${item.code}</td><td>${iScanned} / ${iTotal}</td><td>${item.brutto}</td><td>${item.netto}</td><td>${item.pcs}</td><td style="${colorStyle}">${statusTxt}</td><td>${timeTxt}</td></tr>`;
             });
             html += `</tbody></table>`;
